@@ -1,8 +1,8 @@
 {
   "title": "Micro Assistant",
-  "description": "Shows which counting relics each card play affects, on the card and by the End Turn button.",
-  "visibility": "private",
-  "changeNote": "Initial release.",
+  "description": "Shows which counting relics and powers each card play affects - on the hovered card, and above the End Turn button.",
+  "visibility": "unlisted",
+  "changeNote": "Initial upload.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
