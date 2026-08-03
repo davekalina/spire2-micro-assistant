@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Micro Assistant — Counting Sources One-Sheet</title>
+<style>
+  @page { size: letter; margin: 0.4in; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { font-family: Georgia, "Times New Roman", serif; color: #111; }
+  body { font-size: 9.5pt; line-height: 1.25; }
+
+  header { display: flex; justify-content: space-between; align-items: baseline;
+           border-bottom: 2.5px solid #111; padding-bottom: 4px; margin-bottom: 6px; }
+  h1 { font-size: 15pt; letter-spacing: 0.02em; }
+  header .sub { font-size: 8.5pt; color: #444; font-style: italic; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 8.5pt;
+            padding: 4px 0 6px; border-bottom: 1px solid #999; margin-bottom: 8px; }
+  .legend b { font-family: Arial, sans-serif; font-size: 8pt; }
+  .chip { display: inline-block; border: 1px solid #111; border-radius: 3px;
+          font-family: Arial, sans-serif; font-weight: bold; font-size: 7.5pt;
+          padding: 0 3px; margin-right: 2px; }
+  .chip.x { color: #fff; background: #111; }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+
+  h2 { font-family: Arial, sans-serif; font-size: 8.5pt; text-transform: uppercase;
+       letter-spacing: 0.08em; background: #111; color: #fff; padding: 2px 6px;
+       margin: 8px 0 0; }
+  h2:first-child { margin-top: 0; }
+  h2 .where { float: right; font-weight: normal; text-transform: none;
+              letter-spacing: 0; font-size: 8pt; }
+
+  table { width: 100%; border-collapse: collapse; }
+  td { vertical-align: top; padding: 2.5px 5px 2.5px 0; border-bottom: 1px solid #ddd; }
+  tr:last-child td { border-bottom: 1px solid #999; }
+  td.n { font-family: Arial, sans-serif; font-weight: bold; font-size: 8.5pt;
+         white-space: nowrap; width: 1%; padding-right: 8px; }
+  td.n .sub { display: block; font-weight: normal; font-size: 7pt; color: #666; }
+
+  footer { margin-top: 8px; padding-top: 4px; border-top: 1px solid #999;
+           font-size: 7.5pt; color: #444; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Micro Assistant &mdash; Counting Sources</h1>
+  <div class="sub">v0.3.0 &middot; badges above the hovered card and the End Turn button</div>
+</header>
+
+<div class="legend">
+  <span><b>ON CARD:</b></span>
+  <span><span class="chip">3</span> current count &mdash; this play advances it</span>
+  <span><span class="chip" style="border-color:#8a6d00;color:#8a6d00;">9</span> gold &mdash; this play triggers it</span>
+  <span><span class="chip x">X</span> this play breaks it / gets nothing</span>
+  <span><span class="chip">&#9679;</span> bare icon &mdash; this play triggers it (no counter)</span>
+  <span><b>ON END TURN:</b></span>
+  <span>verdict badge &mdash; hover it in game for the exact &ldquo;Will / Will&nbsp;NOT&rdquo; text</span>
+</div>
+
+<div class="cols">
+<div>
+
+  <h2>Every-Nth Tickers <span class="where">on card</span></h2>
+  <table>
+    <tr><td class="n">Pen Nib</td><td>Every <b>10th attack</b> deals double damage.</td></tr>
+    <tr><td class="n">Nunchaku</td><td>Every <b>10 attacks</b>: +1 energy. Counts across turns.</td></tr>
+    <tr><td class="n">Kunai <span class="sub">per turn</span></td><td>Every <b>3 attacks in a turn</b>: +1 Dexterity.</td></tr>
+    <tr><td class="n">Shuriken <span class="sub">per turn</span></td><td>Every <b>3 attacks in a turn</b>: +1 Strength.</td></tr>
+    <tr><td class="n">Ornamental Fan <span class="sub">per turn</span></td><td>Every <b>3 attacks in a turn</b>: 4 Block.</td></tr>
+    <tr><td class="n">Kusarigama <span class="sub">per turn</span></td><td>Every <b>3 attacks in a turn</b>: 6 damage, random enemy.</td></tr>
+    <tr><td class="n">Letter Opener <span class="sub">per turn</span></td><td>Every <b>3 skills in a turn</b>: 5 damage to all enemies.</td></tr>
+    <tr><td class="n">Tuning Fork</td><td>Every <b>10 skills</b>: 7 Block. Counts across turns.</td></tr>
+    <tr><td class="n">Iron Club</td><td>Every <b>4 cards</b> of any type: draw 1. Counts across turns.</td></tr>
+  </table>
+
+  <h2>Per-Turn Thresholds <span class="where">on card</span></h2>
+  <table>
+    <tr><td class="n">Pocketwatch <span class="sub">+ end turn</span></td><td>Play <b>&le;&nbsp;3 cards</b> this turn &rarr; draw 3 extra next turn. The 4th card breaks it (X).</td></tr>
+    <tr><td class="n">Velvet Choker</td><td>Hard cap: <b>6 cards</b> per turn. Card #7 is refused (X).</td></tr>
+    <tr><td class="n">Brilliant Scarf</td><td>The <b>5th card</b> each turn is free (gold at 4). Quiet after.</td></tr>
+  </table>
+
+  <h2>Don&rsquo;t-Do-X Payoffs <span class="where">card + end turn</span></h2>
+  <table>
+    <tr><td class="n">Art of War</td><td><b>No attacks</b> this turn &rarr; +1 energy next turn. Attacks show X.</td></tr>
+    <tr><td class="n">Ripple Basin</td><td><b>No attacks</b> this turn &rarr; 4 Block at turn end. Attacks show X.</td></tr>
+    <tr><td class="n">Pael&rsquo;s Eye <span class="sub">once/combat</span></td><td><b>No cards at all</b> this turn &rarr; exhaust hand, take an extra turn. Every card shows X while live.</td></tr>
+    <tr><td class="n">Rainbow Ring <span class="sub">per turn</span></td><td>Attack + Skill + Power in one turn &rarr; +1 Str, +1 Dex. Badge on still-missing types; count = types filled.</td></tr>
+    <tr><td class="n">Orichalcum <span class="sub">+ Fake</span></td><td>End the turn at <b>0 Block</b> &rarr; gain 6 (Fake: 3) Block. Block-gaining cards always show X.</td></tr>
+  </table>
+
+</div>
+<div>
+
+  <h2>Turn Tickers <span class="where">end turn only</span></h2>
+  <table>
+    <tr><td class="n">Pendulum</td><td>Every <b>3 turns</b>: draw 1 extra. Badge on the turn before it fires.</td></tr>
+    <tr><td class="n">Happy Flower</td><td>Every <b>3 turns</b>: +1 energy. Badge on the turn before.</td></tr>
+    <tr><td class="n">Fake Happy Flower</td><td>Every <b>5 turns</b>: +1 energy. Badge on the turn before.</td></tr>
+    <tr><td class="n">Pollinous Core</td><td>Every <b>4 turns</b>: draw 2 extra. Badge on the turn before.</td></tr>
+    <tr><td class="n">Stone Calendar</td><td>End of <b>turn 7</b>: 52 damage to all enemies. Badge on turn 7 only.</td></tr>
+  </table>
+
+  <h2>First-X Triggers <span class="where">on card</span></h2>
+  <table>
+    <tr><td class="n">Music Box <span class="sub">per turn</span></td><td><b>First attack</b> each turn is cloned (Ethereal copy to hand). Later attacks show X &mdash; order matters.</td></tr>
+    <tr><td class="n">Vambrace <span class="sub">per combat</span></td><td><b>First block-gaining play</b> gains double Block.</td></tr>
+    <tr><td class="n">Permafrost <span class="sub">per combat</span></td><td><b>First Power card</b> played: 7 Block.</td></tr>
+    <tr><td class="n">Pael&rsquo;s Legion <span class="sub">cooldown</span></td><td>Block-gaining play is doubled, then 2-turn cooldown. Badge only while ready.</td></tr>
+  </table>
+
+  <h2>Powers <span class="where">on card</span></h2>
+  <table>
+    <tr><td class="n">Echo Form <span class="sub">per turn</span></td><td>First <b>N cards</b> each turn are played twice. Count = doublings left; X when spent.</td></tr>
+    <tr><td class="n">Void Form <span class="sub">per turn</span></td><td>First <b>N cards</b> each turn cost 0. Count = free plays left; X when spent.</td></tr>
+    <tr><td class="n">Nostalgia <span class="sub">per turn</span></td><td>First <b>N Attacks/Skills</b> go to the top of the draw pile. Count = remaining.</td></tr>
+    <tr><td class="n">Unmovable <span class="sub">per turn</span></td><td>First <b>N block-gaining plays</b> give double Block. Count = remaining.</td></tr>
+    <tr><td class="n">Lethality <span class="sub">per turn</span></td><td>Only the <b>first attack</b> each turn gets the bonus damage. X once spent.</td></tr>
+    <tr><td class="n">Phantom Blades <span class="sub">per turn</span></td><td>Only the <b>first Shiv</b> each turn gets the bonus damage. X once spent.</td></tr>
+    <tr><td class="n">Juggling <span class="sub">per turn</span></td><td>The <b>3rd attack</b> each turn is cloned. Count of attacks; gold at 2; X after.</td></tr>
+    <tr><td class="n">Pale Blue Dot <span class="sub">+ end turn</span></td><td><b>5 plays in a turn</b> &rarr; draw extra next turn. Countdown; End Turn badge once banked.</td></tr>
+    <tr><td class="n">Panache</td><td>Every <b>5 plays</b>: damage to all enemies. Countdown; resets at turn end.</td></tr>
+  </table>
+
+</div>
+</div>
+
+<footer>
+  Counts are read from the game&rsquo;s own values, so badges always match the relic bar and power icons.
+  Not tracked (by design): locks such as Sloth/Smoggy/Ringing and Normality, end-turn reversals (Tender, Monologue),
+  Unsettling Lamp, and out-of-combat counters &mdash; the game already communicates those.
+  &nbsp;&middot;&nbsp; Micro Assistant &middot; github.com/davekalina/spire2-micro-assistant
+</footer>
+
+</body>
+</html>
