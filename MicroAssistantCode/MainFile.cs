@@ -14,14 +14,21 @@ public partial class MainFile : Node
     /// </summary>
     public const string ModId = "MicroAssistant";
 
+    public const string ModName = "Micro Assistant";
+
+    /// <summary>Keep in sync with the <c>version</c> field in MicroAssistant.json.</summary>
+    public const string Version = "v0.1.0";
+
     public static MegaCrit.Sts2.Core.Logging.Logger Logger { get; } =
         new(ModId, MegaCrit.Sts2.Core.Logging.LogType.Generic);
 
     public static void Initialize()
     {
+        // PatchAll is deliberately not guarded. A patch whose target has moved means
+        // this build does not fit this game, and the loader's own "failed to
+        // initialize" is the honest report — better than a mod that loads and then
+        // misbehaves in ways the player has to diagnose.
         new Harmony(ModId).PatchAll();
-
-        // Keep this string in sync with the manifest version.
-        Logger.Info("Micro Assistant v0.1.0 initialized.");
+        Logger.Info($"{ModName} {Version} initialized.");
     }
 }
