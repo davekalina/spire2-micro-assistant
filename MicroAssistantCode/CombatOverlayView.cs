@@ -42,14 +42,17 @@ internal sealed class CombatOverlayView : IDisposable
     private readonly List<RelicModel> _subscribedRelics = [];
     private HBoxContainer? _endTurnStrip;
     private HBoxContainer? _handStrip;
-    private NHandCardHolder? _focusedHolder;
+
+    /// <summary>The holder the hand strip rides: the focused card, or the one in play.</summary>
+    private NHandCardHolder? _stripHolder;
+
     private Player? _player;
 
     public CombatOverlayView(NCombatUi ui) => _ui = ui;
 
     public void Attach()
     {
-        _endTurnStrip = RelicBadgeStrip.CreateContainer("MicroAssistantEndTurnStrip");
+        _endTurnStrip = BadgeStrip.CreateContainer("MicroAssistantEndTurnStrip");
         _endTurnStrip.OffsetLeft = EndTurnStripLeft;
         _endTurnStrip.OffsetRight = EndTurnStripRight;
         _endTurnStrip.OffsetTop = EndTurnStripTop;
@@ -64,6 +67,10 @@ internal sealed class CombatOverlayView : IDisposable
         CombatManager.Instance.TurnStarted += OnTurnChanged;
         CombatManager.Instance.TurnEnded += OnTurnChanged;
         RunManager.Instance.HoveredModelTracker.HoverChanged += OnHoverChanged;
+        // Powers have no per-instance events worth wiring; the tracker's coalesced
+        // once-per-frame signal covers power changes, history ticks, and anything
+        // else the specific subscriptions above miss.
+        CombatManager.Instance.StateTracker.CombatStateChanged += OnCombatStateChanged;
 
         // The combat usually begins after the UI readies, but bind now in case this
         // view arrives mid-combat.
@@ -78,10 +85,11 @@ internal sealed class CombatOverlayView : IDisposable
         CombatManager.Instance.TurnStarted -= OnTurnChanged;
         CombatManager.Instance.TurnEnded -= OnTurnChanged;
         RunManager.Instance.HoveredModelTracker.HoverChanged -= OnHoverChanged;
+        CombatManager.Instance.StateTracker.CombatStateChanged -= OnCombatStateChanged;
         UnbindPlayer();
         FreeStrip(ref _handStrip);
         FreeStrip(ref _endTurnStrip);
-        _focusedHolder = null;
+        _stripHolder = null;
     }
 
     private void OnCombatBegan(CombatState state) =>
@@ -100,6 +108,13 @@ internal sealed class CombatOverlayView : IDisposable
 
     private void OnHoverChanged(ulong _) =>
         Guard.Run("Following the focused hand card", SyncHandStrip);
+
+    private void OnCombatStateChanged(CombatState _) =>
+        Guard.Run("Refreshing badges on combat state change", () =>
+        {
+            RefreshEndTurn();
+            SyncHandStrip();
+        });
 
     /// <summary>A tracked relic's counter or status moved; both strips may care.</summary>
     private void OnRelicChanged() =>
@@ -154,7 +169,7 @@ internal sealed class CombatOverlayView : IDisposable
         _subscribedRelics.Clear();
         if (_player == null)
             return;
-        foreach (var relic in CountingRelicTracker.TrackedRelics(_player))
+        foreach (var relic in CountingTracker.TrackedRelics(_player))
         {
             relic.DisplayAmountChanged += OnRelicChanged;
             relic.StatusChanged += OnRelicChanged;
@@ -167,32 +182,36 @@ internal sealed class CombatOverlayView : IDisposable
         if (_endTurnStrip == null || !GodotObject.IsInstanceValid(_endTurnStrip))
             return;
         var badges = _player != null && CombatManager.Instance.IsInProgress
-            ? CountingRelicTracker.ForEndTurn(_player)
+            ? CountingTracker.ForEndTurn(_player)
             : [];
-        RelicBadgeStrip.SetBadges(_endTurnStrip, badges);
+        BadgeStrip.SetBadges(_endTurnStrip, badges);
     }
 
-    /// <summary>Move the hand strip to whichever holder is focused now, if any.</summary>
+    /// <summary>
+    /// Move the hand strip to whichever holder deserves it now: the focused card in
+    /// hand, or — so the information survives dragging the card out to play it —
+    /// the holder of the card play in progress.
+    /// </summary>
     private void SyncHandStrip()
     {
         var holder = CombatManager.Instance.IsInProgress
-            ? NPlayerHand.Instance?.FocusedHolder
+            ? NPlayerHand.Instance?.FocusedHolder ?? InPlayHolder()
             : null;
-        if (holder == _focusedHolder)
+        if (holder == _stripHolder)
         {
             RefreshHandBadges();
             return;
         }
 
         FreeStrip(ref _handStrip);
-        _focusedHolder = holder;
+        _stripHolder = holder;
         if (holder == null)
             return;
 
         // Parented to the holder, the strip rides the card's pop-up motion and is
         // freed with it. The focused holder is unrotated at scale one, so these
         // holder-local offsets are exact screen shape.
-        _handStrip = RelicBadgeStrip.CreateContainer("MicroAssistantHandStrip");
+        _handStrip = BadgeStrip.CreateContainer("MicroAssistantHandStrip");
         _handStrip.OffsetLeft = -HandStripHalfWidth;
         _handStrip.OffsetRight = HandStripHalfWidth;
         _handStrip.OffsetTop = HandStripTop;
@@ -205,13 +224,34 @@ internal sealed class CombatOverlayView : IDisposable
     {
         if (_handStrip == null || !GodotObject.IsInstanceValid(_handStrip))
             return;
-        var card = _focusedHolder != null && GodotObject.IsInstanceValid(_focusedHolder)
-            ? _focusedHolder.CardModel
+        var card = _stripHolder != null && GodotObject.IsInstanceValid(_stripHolder)
+            ? _stripHolder.CardModel
             : null;
         var badges = card != null && CombatManager.Instance.IsInProgress
-            ? CountingRelicTracker.ForCardPlay(card.Owner, card)
+            ? CountingTracker.ForCardPlay(card.Owner, card)
             : [];
-        RelicBadgeStrip.SetBadges(_handStrip, badges);
+        BadgeStrip.SetBadges(_handStrip, badges);
+    }
+
+    /// <summary>
+    /// The holder of the card play in progress, if any. It is reparented onto the
+    /// hand node for the duration of the play and freed or returned afterwards.
+    /// </summary>
+    private static NHandCardHolder? InPlayHolder()
+    {
+        var hand = NPlayerHand.Instance;
+        if (hand == null || !hand.InCardPlay)
+            return null;
+        // The play object is private, but it is a registered Godot script property.
+        if (hand.Get("_currentCardPlay").As<GodotObject>() is NCardPlay play &&
+            GodotObject.IsInstanceValid(play) &&
+            GodotObject.IsInstanceValid(play.Holder))
+            return play.Holder;
+        // Fallback: the in-play holder is the one parented directly to the hand.
+        foreach (var child in hand.GetChildren())
+            if (child is NHandCardHolder holder)
+                return holder;
+        return null;
     }
 
     private static void FreeStrip(ref HBoxContainer? strip)

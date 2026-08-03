@@ -18,43 +18,61 @@ pipeline work. Those are platform facts. This file is how I want the work done.
 | Gameplay | Informational only; `affects_gameplay` is `false` |
 | Dependencies | None yet |
 
-The mod shows how counting relics react to what the player is about to do, on two
-surfaces during combat:
+The mod shows how counting sources — relics and powers — react to what the player
+is about to do, on two surfaces during combat:
 
 - **Above the focused hand card** (mouse hover and controller focus both count): a
-  centered row of relic badges — the relic's atlas icon with its current count, or
-  X-ed out when playing that card would break the relic's condition.
-- **Above the End Turn button**: badges for turn-scoped relics only — Pocketwatch
-  active or X-ed out by cards played this turn, Pendulum only on the turn before it
-  fires. Pen Nib never appears here.
+  centered row of badges — the source's atlas icon with its current count, or X-ed
+  out when playing that card would break its condition or miss its window. The
+  strip stays with the card while it is dragged out and played.
+- **Above the End Turn button**: badges for sources where ending the turn is the
+  decision — will/will-NOT verdicts with native hover tips.
+
+Covered sources (one registry entry each in `CountingTracker`): relics —
+Pocketwatch, Pendulum, Pen Nib, Nunchaku, Kunai, Shuriken, Ornamental Fan,
+Kusarigama, Letter Opener, Tuning Fork, Iron Club, Brilliant Scarf, Velvet Choker,
+Art of War, Ripple Basin, Pael's Eye, Rainbow Ring, Happy Flower, Fake Happy
+Flower, Pollinous Core, Stone Calendar, Music Box, Vambrace, Permafrost, Pael's
+Legion, Orichalcum, Fake Orichalcum; powers — Echo Form, Void Form, Nostalgia,
+Unmovable, Lethality, Phantom Blades, Juggling, Pale Blue Dot, Panache.
+Deliberately excluded: Unsettling Lamp (a card's "applies a debuff to an enemy" is
+only decidable at play time), locks and end-turn reversals (the game communicates
+them), Make It So / Normality / FTL.
 
 The layering that must not regress silently:
 
 - `CountingRules` is the pure decision logic (game-independent, linked into the test
-  project) — what a card play does to a relic, what belongs above End Turn.
-- `CountingRelicTracker` maps rules onto live relic models, one registry entry per
-  relic (Pocketwatch, Pendulum, Pen Nib). Counts are read from the same members the
-  native relic bar prints (`DisplayAmount`, `TurnsSeen`), never recomputed, so this
-  display cannot drift from the bar.
+  project) — what a card play does to a source, what belongs above End Turn.
+- `CountingTracker` maps rules onto live models, one registry entry per source.
+  Counts come from the members the native UI prints (`DisplayAmount`, `TurnsSeen`,
+  DynamicVars) or from `CombatQueries`, which mirrors each source's own combat-
+  history predicate verbatim — never from independent bookkeeping.
 - `CombatOverlayView` is event-driven off the signals the native UI repaints on
   (`DisplayAmountChanged`/`StatusChanged`, `HoveredModelTracker.HoverChanged`,
-  `CombatManager` lifecycle). No polling, no per-frame work.
+  `CombatManager` lifecycle, plus the coalesced `StateTracker.CombatStateChanged`
+  as the catch-all for power and history changes). No polling, no per-frame work.
 - The only Harmony patches are `NCombatUi._Ready`/`_ExitTree` in `CombatUiPatch`;
-  every game→mod boundary is wrapped in `Guard`.
+  every game→mod boundary is wrapped in `Guard`. The one private read is the
+  hand's `_currentCardPlay` Godot property (with a child-scan fallback) for the
+  follow-the-played-card behavior.
 
 ### Surfaces to audit
 
 Any directional change must be applied across all of these:
 
 - the badge strip above the focused hand card (mouse hover and controller focus;
-  count badge, X-ed-out badge, primed gold count, multi-relic rows);
+  count badge, X-ed-out badge, bare-icon badge, primed gold count, multi-source
+  rows mixing relics and powers);
+- the strip riding a card that is being dragged, targeted, and played (mouse and
+  controller; cancel returns it to hand cleanly);
 - the badge strip above the End Turn button (active, X-ed out, hidden states; enemy
   turn, when the strip rides the button's slide-out tween);
 - the hover tips on End Turn badges (will / will NOT wording, counts read from the
-  relic's DynamicVars; hand badges must never catch the mouse and get no tips);
-- badge visuals shared by both strips (`RelicBadgeStrip`: icon, count label, X mark);
+  source's DynamicVars; hand badges must never catch the mouse and get no tips);
+- badge visuals shared by both strips (`BadgeStrip`: icon, count label, X mark);
 - combat lifecycle edges: combat start and end, relic gained or lost mid-combat,
-  relic melted, card played while another card is focused.
+  power applied or removed mid-combat, relic melted, instanced powers appearing
+  more than once, card played while another card is focused.
 
 ## Mod UI: match the game
 

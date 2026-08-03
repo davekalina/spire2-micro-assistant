@@ -64,4 +64,90 @@ public static class CountingRules
 
     /// <summary>The next contributing play is the one that triggers the relic.</summary>
     public static bool IsPrimed(int count, int threshold) => count == threshold - 1;
+
+    /// <summary>
+    /// Every-Nth tickers (Nunchaku, Kunai, Iron Club, ...): a matching card advances
+    /// the count and nothing can break it.
+    /// </summary>
+    public static CardPlayEffect TickerPlay(bool cardMatches) =>
+        cardMatches ? CardPlayEffect.Contributes : CardPlayEffect.None;
+
+    /// <summary>
+    /// Brilliant Scarf: the Nth card each turn is free; once the window is spent for
+    /// the turn there is nothing left to say.
+    /// </summary>
+    public static CardPlayEffect ScarfPlay(int playedThisTurn, int threshold) =>
+        playedThisTurn < threshold ? CardPlayEffect.Contributes : CardPlayEffect.None;
+
+    /// <summary>Velvet Choker: a hard cap; the card at the limit is refused outright.</summary>
+    public static CardPlayEffect ChokerPlay(int playedThisTurn, int limit) =>
+        playedThisTurn >= limit ? CardPlayEffect.Breaks : CardPlayEffect.Contributes;
+
+    /// <summary>
+    /// "Don't do X this turn" (Art of War, Ripple Basin): a matching play forfeits
+    /// the payoff, and keeps reading as forfeited for the rest of the turn.
+    /// </summary>
+    public static CardPlayEffect AvoidancePlay(bool cardMatches) =>
+        cardMatches ? CardPlayEffect.Breaks : CardPlayEffect.None;
+
+    public static EndTurnState AvoidanceEndTurn(bool conditionIntact) =>
+        conditionIntact ? EndTurnState.Active : EndTurnState.Broken;
+
+    /// <summary>
+    /// Pael's Eye: any play breaks it, but it is once per combat and retryable next
+    /// turn, so it only speaks while the zero-card turn is still achievable.
+    /// </summary>
+    public static CardPlayEffect PaelsEyePlay(bool intactAndUnused) =>
+        intactAndUnused ? CardPlayEffect.Breaks : CardPlayEffect.None;
+
+    public static EndTurnState PaelsEyeEndTurn(bool intactAndUnused) =>
+        intactAndUnused ? EndTurnState.Active : EndTurnState.Hidden;
+
+    /// <summary>
+    /// Rainbow Ring: a card contributes only while the trio is unfinished and this
+    /// card's type is still missing this turn.
+    /// </summary>
+    public static CardPlayEffect RainbowPlay(bool typeMissing, bool activatedThisTurn) =>
+        !activatedThisTurn && typeMissing ? CardPlayEffect.Contributes : CardPlayEffect.None;
+
+    /// <summary>
+    /// Pollinous Core counts turns without wrapping and fires at the hand draw once
+    /// past the cycle, so "primed" is at-or-beyond rather than Pendulum's exact hit.
+    /// </summary>
+    public static EndTurnState PollinousEndTurn(int turnsSeen, int turns) =>
+        turnsSeen >= turns - 1 ? EndTurnState.Active : EndTurnState.Hidden;
+
+    /// <summary>Stone Calendar: fires when its damage turn is ended.</summary>
+    public static EndTurnState StoneCalendarEndTurn(int turnNumber, int damageTurn) =>
+        turnNumber == damageTurn ? EndTurnState.Active : EndTurnState.Hidden;
+
+    /// <summary>
+    /// First-match triggers (Music Box each turn; Vambrace, Permafrost, Pael's
+    /// Legion per combat or cooldown): the icon while armed. Per-turn sources show a
+    /// spent X — the order of plays still matters today; per-combat sources go
+    /// quiet instead of X-ing every qualifying card for the rest of the fight.
+    /// </summary>
+    public static CardPlayEffect FirstMatchPlay(bool cardMatches, bool armed, bool showSpentX) =>
+        !cardMatches ? CardPlayEffect.None :
+        armed ? CardPlayEffect.Contributes :
+        showSpentX ? CardPlayEffect.Breaks : CardPlayEffect.None;
+
+    /// <summary>
+    /// Orichalcum: gaining block is always the argument against it; the End Turn
+    /// verdict is simply whether block is zero right now.
+    /// </summary>
+    public static CardPlayEffect OrichalcumPlay(bool cardGainsBlock) =>
+        cardGainsBlock ? CardPlayEffect.Breaks : CardPlayEffect.None;
+
+    public static EndTurnState OrichalcumEndTurn(int currentBlock) =>
+        currentBlock == 0 ? EndTurnState.Active : EndTurnState.Broken;
+
+    /// <summary>
+    /// Allowance powers (Echo Form, Void Form, ...): the first N matching plays each
+    /// turn get the benefit; once the allowance is spent a matching card is X-ed —
+    /// it no longer receives the effect.
+    /// </summary>
+    public static CardPlayEffect AllowancePlay(bool cardMatches, int remaining) =>
+        !cardMatches ? CardPlayEffect.None :
+        remaining > 0 ? CardPlayEffect.Contributes : CardPlayEffect.Breaks;
 }

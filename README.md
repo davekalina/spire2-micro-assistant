@@ -1,22 +1,24 @@
 # Micro Assistant
 
-An informational Slay the Spire 2 mod that shows how your counting relics react to
-what you are about to do.
+An informational Slay the Spire 2 mod that shows how your counting relics and
+powers react to what you are about to do.
 
-- Hover or controller-focus a card in hand, and the relics that care about playing it
-  appear above the card — with their current count, or X-ed out if playing the card
-  would break the relic's condition (a fourth card under Pocketwatch).
-- Above the End Turn button, turn-scoped relics show whether ending the turn keeps
-  their payoff: Pocketwatch while its condition still holds (X-ed out once it is
-  lost), Pendulum only on the turn before it fires. Hovering a badge shows a native
-  tooltip spelling out what will happen — "will draw 3 extra cards next turn" or
-  "will NOT".
+- Hover or controller-focus a card in hand, and the sources that care about playing
+  it appear above the card — with their current count, or X-ed out if playing the
+  card would break their condition (a fourth card under Pocketwatch, an attack
+  under Art of War) or miss their window (a card past Echo Form's doublings). The
+  row stays with the card while you drag it out and play it.
+- Above the End Turn button, sources for which ending the turn is the decision show
+  a will/will-NOT verdict: Pocketwatch, Art of War, Ripple Basin, Orichalcum,
+  Pendulum and the other turn tickers, Pael's Eye, Pale Blue Dot. Hovering a badge
+  shows a native tooltip spelling it out — "Will draw 3 extra cards next turn." or
+  "Will NOT".
 
-Counts are read from the same values the relic bar prints, so the two never
+Counts are read from the same values the game's own UI prints, so the two never
 disagree. Nothing about the game's behavior changes.
 
-Covered so far: **Pocketwatch**, **Pendulum**, **Pen Nib**. Adding another counting
-relic is one registry entry in `MicroAssistantCode/CountingRelicTracker.cs`.
+Covers ~27 relics and 9 powers; the full list is in `AGENTS.md`. Adding another
+source is one registry entry in `MicroAssistantCode/CountingTracker.cs`.
 
 ## Build
 

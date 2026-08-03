@@ -9,8 +9,8 @@ using MegaCrit.Sts2.addons.mega_text;
 namespace MicroAssistant.MicroAssistantCode;
 
 /// <summary>
-/// Builds a centered horizontal row of relic badges: the relic's own atlas icon with
-/// either its current count or an X over it.
+/// Builds a centered horizontal row of source badges: the source's own atlas icon
+/// with either a count or an X over it.
 ///
 /// The badge copies its geometry and label styling from the game's buff/debuff icon
 /// (res://scenes/combat/power.tscn), the native "small icon with a count" in combat:
@@ -18,7 +18,7 @@ namespace MicroAssistant.MicroAssistantCode;
 /// fill, outline, and shadow. The X has no native standalone texture, so it is the
 /// same Kreon face in the game's red, sized to fill the icon.
 /// </summary>
-internal static class RelicBadgeStrip
+internal static class BadgeStrip
 {
     private const string CountFontPath = "res://themes/kreon_bold_glyph_space_one.tres";
 
@@ -29,7 +29,7 @@ internal static class RelicBadgeStrip
     private static readonly Color CountShadow = new(0f, 0f, 0f, 0.188235f);
     private static readonly Color CountOutline = new(0.12f, 0.10208f, 0.0816f);
 
-    // The X is translucent and lightly outlined so the relic icon stays readable
+    // The X is translucent and lightly outlined so the source icon stays readable
     // under it; the icon itself is not dimmed.
     private const int BrokenFontSize = 30;
     private static readonly Color BrokenRed = new(
@@ -59,7 +59,7 @@ internal static class RelicBadgeStrip
     }
 
     /// <summary>Replace the strip's badges. An empty list leaves the strip blank.</summary>
-    public static void SetBadges(HBoxContainer strip, IReadOnlyList<RelicBadge> badges)
+    public static void SetBadges(HBoxContainer strip, IReadOnlyList<SourceBadge> badges)
     {
         foreach (var child in strip.GetChildren())
         {
@@ -72,7 +72,7 @@ internal static class RelicBadgeStrip
             strip.AddChild(CreateBadge(badge));
     }
 
-    private static Control CreateBadge(RelicBadge badge)
+    private static Control CreateBadge(SourceBadge badge)
     {
         var cell = new Control
         {
@@ -82,7 +82,7 @@ internal static class RelicBadgeStrip
 
         var icon = new TextureRect
         {
-            Texture = badge.Relic.Icon,
+            Texture = badge.Icon,
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             MouseFilter = Control.MouseFilterEnum.Ignore,
@@ -93,7 +93,7 @@ internal static class RelicBadgeStrip
 
         if (badge.Broken)
             cell.AddChild(BrokenMark());
-        else
+        else if (badge.CountText != null)
             cell.AddChild(CountLabel(badge));
 
         if (badge.Tip is { } tip)
@@ -106,7 +106,7 @@ internal static class RelicBadgeStrip
     /// which is safe only where the strip floats over empty background — never on a
     /// badge above a hand card, where it would steal the card's own hover.
     /// </summary>
-    private static void AttachHoverTip(Control cell, RelicBadge badge, BadgeTip tip)
+    private static void AttachHoverTip(Control cell, SourceBadge badge, BadgeTip tip)
     {
         cell.MouseFilter = Control.MouseFilterEnum.Stop;
         cell.MouseEntered += () => Guard.Run("Showing a badge hover tip", () =>
@@ -115,18 +115,18 @@ internal static class RelicBadgeStrip
             TipTitle.SetValue(boxed, tip.Title);
             TipDescription.SetValue(boxed, tip.Body);
             var hoverTip = (HoverTip)boxed;
-            hoverTip.Id = $"{MainFile.ModId}.{badge.Relic.Id.Entry}";
+            hoverTip.Id = $"{MainFile.ModId}.{badge.Id}";
             NHoverTipSet.CreateAndShow(cell, hoverTip, HoverTipAlignment.Left);
         });
         cell.MouseExited += () => Guard.Run("Hiding a badge hover tip", () =>
             NHoverTipSet.Remove(cell));
     }
 
-    private static MegaLabel CountLabel(RelicBadge badge)
+    private static MegaLabel CountLabel(SourceBadge badge)
     {
         var label = new MegaLabel
         {
-            Text = badge.Count.ToString(),
+            Text = badge.CountText,
             HorizontalAlignment = HorizontalAlignment.Right,
             VerticalAlignment = VerticalAlignment.Center,
             MouseFilter = Control.MouseFilterEnum.Ignore,
@@ -142,7 +142,7 @@ internal static class RelicBadgeStrip
         return label;
     }
 
-    /// <summary>The X for a play that would break the relic, centered over the icon.</summary>
+    /// <summary>The X for a play that would break the source, centered over the icon.</summary>
     private static MegaLabel BrokenMark()
     {
         var label = new MegaLabel
