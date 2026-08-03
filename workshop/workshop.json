@@ -2,7 +2,7 @@
   "title": "Micro Assistant",
   "description": "Shows which counting relics and powers each card play affects - on the hovered card, and above the End Turn button.",
   "visibility": "unlisted",
-  "changeNote": "Initial upload.",
+  "changeNote": "v0.4.0: while a card is held for play, badges show the value each counter is about to become (in aqua). Covers 27 relics and 9 powers; End Turn badges have will/will-NOT tooltips.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
