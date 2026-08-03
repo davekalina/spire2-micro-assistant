@@ -14,11 +14,13 @@ internal sealed record BadgeTip(string Title, string Body);
 /// <summary>
 /// One icon in a strip. CountText is printed on the icon when present; Broken draws
 /// an X instead. Primed colors the count gold: the very next tick triggers the
-/// source. Tip is set only on End Turn badges; hand badges must not catch the mouse.
+/// source. Projected colors it aqua: the card is held for play and the number is
+/// what the counter is about to become, not what it is. Tip is set only on End
+/// Turn badges; hand badges must not catch the mouse.
 /// </summary>
 internal sealed record SourceBadge(
     Texture2D Icon, string Id, string? CountText, bool Broken, bool Primed,
-    BadgeTip? Tip = null);
+    bool Projected = false, BadgeTip? Tip = null);
 
 /// <summary>
 /// Which counting sources — relics and powers — care about a card play or about
@@ -44,14 +46,16 @@ internal static class CountingTracker
         Func<RelicModel, EndTurnState> EndTurn,
         Func<RelicModel, string?> CountText,
         Func<RelicModel, bool> Primed,
-        Func<RelicModel, EndTurnState, BadgeTip?> EndTurnTip);
+        Func<RelicModel, EndTurnState, BadgeTip?> EndTurnTip,
+        Func<RelicModel, string>? NextCount = null);
 
     private sealed record PowerSemantics(
         Func<PowerModel, Player, CardModel, CardPlayEffect> PlayEffect,
         Func<PowerModel, Player, EndTurnState> EndTurn,
         Func<PowerModel, Player, string?> CountText,
         Func<PowerModel, Player, bool> Primed,
-        Func<PowerModel, Player, EndTurnState, BadgeTip?> EndTurnTip);
+        Func<PowerModel, Player, EndTurnState, BadgeTip?> EndTurnTip,
+        Func<PowerModel, Player, string>? NextCount = null);
 
     private static readonly Dictionary<Type, RelicSemantics> Relics = new()
     {
@@ -69,7 +73,8 @@ internal static class CountingTracker
                 Title(relic),
                 state == EndTurnState.Active
                     ? $"Will draw {Cards(relic)} extra {CardWord(Cards(relic))} next turn."
-                    : "Will NOT draw extra cards next turn.")),
+                    : "Will NOT draw extra cards next turn."),
+            NextCount: relic => CountingRules.NextUp(relic.DisplayAmount).ToString()),
 
         // Velvet Choker hard-blocks the card past its limit rather than costing a payoff.
         [typeof(VelvetChoker)] = new(
@@ -78,7 +83,8 @@ internal static class CountingTracker
             EndTurn: _ => EndTurnState.Hidden,
             CountText: relic => relic.DisplayAmount.ToString(),
             Primed: _ => false,
-            EndTurnTip: (_, _) => null),
+            EndTurnTip: (_, _) => null,
+            NextCount: relic => CountingRules.NextUp(relic.DisplayAmount).ToString()),
 
         // Brilliant Scarf makes the Nth card of the turn free; quiet once spent.
         [typeof(BrilliantScarf)] = new(
@@ -87,7 +93,8 @@ internal static class CountingTracker
             EndTurn: _ => EndTurnState.Hidden,
             CountText: relic => relic.DisplayAmount.ToString(),
             Primed: relic => CountingRules.IsPrimed(relic.DisplayAmount, Cards(relic)),
-            EndTurnTip: (_, _) => null),
+            EndTurnTip: (_, _) => null,
+            NextCount: relic => CountingRules.NextUp(relic.DisplayAmount).ToString()),
 
         // ---- "Don't do X this turn" payoffs -----------------------------------
 
@@ -142,7 +149,9 @@ internal static class CountingTracker
             EndTurn: _ => EndTurnState.Hidden,
             CountText: relic => RainbowTypesFilled(relic.Owner).ToString(),
             Primed: relic => RainbowTypesFilled(relic.Owner) == 2,
-            EndTurnTip: (_, _) => null),
+            EndTurnTip: (_, _) => null,
+            NextCount: relic =>
+                CountingRules.NextUp(RainbowTypesFilled(relic.Owner)).ToString()),
 
         // ---- Every-Nth card tickers (count on the native bar; the badge adds
         //      "this card advances it") ----------------------------------------
@@ -163,7 +172,9 @@ internal static class CountingTracker
             EndTurn: _ => CountingRules.PenNibEndTurn(),
             CountText: relic => relic.DisplayAmount.ToString(),
             Primed: relic => CountingRules.IsPrimed(relic.DisplayAmount, PenNibThreshold),
-            EndTurnTip: (_, _) => null),
+            EndTurnTip: (_, _) => null,
+            NextCount: relic =>
+                CountingRules.NextWrapped(relic.DisplayAmount, PenNibThreshold).ToString()),
 
         // ---- First-X triggers -------------------------------------------------
 
@@ -326,7 +337,10 @@ internal static class CountingTracker
                 Math.Min(CombatQueries.AttacksStartedThisTurn(player), JugglingThreshold).ToString(),
             Primed: (_, player) =>
                 CombatQueries.AttacksStartedThisTurn(player) == JugglingThreshold - 1,
-            EndTurnTip: (_, _, _) => null),
+            EndTurnTip: (_, _, _) => null,
+            NextCount: (_, player) => Math.Min(
+                CountingRules.NextUp(CombatQueries.AttacksStartedThisTurn(player)),
+                JugglingThreshold).ToString()),
 
         // Pale Blue Dot: five plays in a turn draws cards next turn. DisplayAmount
         // is the native countdown; once it hits zero the payoff is banked and the
@@ -344,20 +358,31 @@ internal static class CountingTracker
             Primed: (power, _) => power.DisplayAmount == 1,
             EndTurnTip: (power, _, _) => new BadgeTip(
                 Title(power),
-                $"Will draw {power.Amount} extra {CardWord(power.Amount)} next turn.")),
+                $"Will draw {power.Amount} extra {CardWord(power.Amount)} next turn."),
+            NextCount: (power, _) =>
+                CountingRules.NextDown(power.DisplayAmount).ToString()),
 
         // Panache: every fifth play hits all enemies; the counter is public via its
-        // CardsLeft DynamicVar and counts down.
+        // CardsLeft DynamicVar and counts down. It fires at zero and restarts from
+        // five (mirrors the power's private _baseCardsLeft const).
         [typeof(PanachePower)] = new(
             PlayEffect: (_, _, _) => CardPlayEffect.Contributes,
             EndTurn: (_, _) => EndTurnState.Hidden,
             CountText: (power, _) => power.DynamicVars["CardsLeft"].IntValue.ToString(),
             Primed: (power, _) => power.DynamicVars["CardsLeft"].IntValue == 1,
-            EndTurnTip: (_, _, _) => null),
+            EndTurnTip: (_, _, _) => null,
+            NextCount: (power, _) => CountingRules.NextCountdownWithReset(
+                power.DynamicVars["CardsLeft"].IntValue, resetTo: 5).ToString()),
     };
 
-    /// <summary>The badges to draw above a hovered card: relics, then powers.</summary>
-    public static List<SourceBadge> ForCardPlay(Player player, CardModel card)
+    /// <summary>
+    /// The badges to draw above a hovered card: relics, then powers. With
+    /// <paramref name="projected" /> — the card is held for play — a contributing
+    /// badge shows the value its counter is about to become instead of the current
+    /// one, in the projection color.
+    /// </summary>
+    public static List<SourceBadge> ForCardPlay(
+        Player player, CardModel card, bool projected = false)
     {
         var badges = new List<SourceBadge>();
         foreach (var (relic, semantics) in TrackedRelicPairs(player))
@@ -365,24 +390,32 @@ internal static class CountingTracker
             var effect = semantics.PlayEffect(relic, card);
             if (effect == CardPlayEffect.None)
                 continue;
+            var next = projected && effect == CardPlayEffect.Contributes
+                ? semantics.NextCount?.Invoke(relic)
+                : null;
             badges.Add(new SourceBadge(
                 relic.Icon,
                 relic.Id.Entry,
-                semantics.CountText(relic),
+                next ?? semantics.CountText(relic),
                 Broken: effect == CardPlayEffect.Breaks,
-                semantics.Primed(relic)));
+                Primed: next == null && semantics.Primed(relic),
+                Projected: next != null));
         }
         foreach (var (power, semantics) in TrackedPowerPairs(player))
         {
             var effect = semantics.PlayEffect(power, player, card);
             if (effect == CardPlayEffect.None)
                 continue;
+            var next = projected && effect == CardPlayEffect.Contributes
+                ? semantics.NextCount?.Invoke(power, player)
+                : null;
             badges.Add(new SourceBadge(
                 power.Icon,
                 power.Id.Entry,
-                semantics.CountText(power, player),
+                next ?? semantics.CountText(power, player),
                 Broken: effect == CardPlayEffect.Breaks,
-                semantics.Primed(power, player)));
+                Primed: next == null && semantics.Primed(power, player),
+                Projected: next != null));
         }
         return badges;
     }
@@ -402,7 +435,7 @@ internal static class CountingTracker
                 semantics.CountText(relic),
                 Broken: state == EndTurnState.Broken,
                 semantics.Primed(relic),
-                semantics.EndTurnTip(relic, state)));
+                Tip: semantics.EndTurnTip(relic, state)));
         }
         foreach (var (power, semantics) in TrackedPowerPairs(player))
         {
@@ -415,7 +448,7 @@ internal static class CountingTracker
                 semantics.CountText(power, player),
                 Broken: state == EndTurnState.Broken,
                 semantics.Primed(power, player),
-                semantics.EndTurnTip(power, player, state)));
+                Tip: semantics.EndTurnTip(power, player, state)));
         }
         return badges;
     }
@@ -463,7 +496,9 @@ internal static class CountingTracker
         EndTurn: _ => EndTurnState.Hidden,
         CountText: relic => relic.DisplayAmount.ToString(),
         Primed: relic => CountingRules.IsPrimed(relic.DisplayAmount, Cards(relic)),
-        EndTurnTip: (_, _) => null);
+        EndTurnTip: (_, _) => null,
+        NextCount: relic =>
+            CountingRules.NextWrapped(relic.DisplayAmount, Cards(relic)).ToString());
 
     private static RelicSemantics OrichalcumEntry() => new(
         PlayEffect: (_, card) => CountingRules.OrichalcumPlay(card.GainsBlock),
@@ -486,7 +521,9 @@ internal static class CountingTracker
         CountText: (power, player) =>
             Math.Max(0, power.Amount - used(power, player)).ToString(),
         Primed: (power, player) => power.Amount - used(power, player) == 1,
-        EndTurnTip: (_, _, _) => null);
+        EndTurnTip: (_, _, _) => null,
+        NextCount: (power, player) =>
+            CountingRules.NextDown(power.Amount - used(power, player)).ToString());
 
     /// <summary>Once-per-turn firsts: the bare icon while armed, X once spent.</summary>
     private static PowerSemantics FirstEachTurn(

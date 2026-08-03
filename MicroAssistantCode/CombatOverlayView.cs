@@ -46,6 +46,9 @@ internal sealed class CombatOverlayView : IDisposable
     /// <summary>The holder the hand strip rides: the focused card, or the one in play.</summary>
     private NHandCardHolder? _stripHolder;
 
+    /// <summary>True while the strip rides a card held for play: counts are projected.</summary>
+    private bool _projected;
+
     private Player? _player;
 
     public CombatOverlayView(NCombatUi ui) => _ui = ui;
@@ -187,18 +190,29 @@ internal sealed class CombatOverlayView : IDisposable
         BadgeStrip.SetBadges(_endTurnStrip, badges);
     }
 
+    /// <summary>Resync now; for patches that fire on transitions no event covers.</summary>
+    public void SyncHandStripNow() => SyncHandStrip();
+
     /// <summary>
-    /// Move the hand strip to whichever holder deserves it now: the focused card in
-    /// hand, or — so the information survives dragging the card out to play it —
-    /// the holder of the card play in progress.
+    /// Move the hand strip to whichever holder deserves it now: the card play in
+    /// progress — so the information survives dragging the card out, and switches
+    /// to projected counts — or the focused card in hand. In-play wins because at
+    /// the moment a play starts the old holder may still briefly hold focus.
     /// </summary>
     private void SyncHandStrip()
     {
-        var holder = CombatManager.Instance.IsInProgress
-            ? NPlayerHand.Instance?.FocusedHolder ?? InPlayHolder()
-            : null;
+        NHandCardHolder? holder = null;
+        _projected = false;
+        if (CombatManager.Instance.IsInProgress)
+        {
+            var inPlay = InPlayHolder();
+            _projected = inPlay != null;
+            holder = inPlay ?? NPlayerHand.Instance?.FocusedHolder;
+        }
         if (holder == _stripHolder)
         {
+            // Same holder, but hover may have just become a play (or the reverse);
+            // the refresh re-reads _projected either way.
             RefreshHandBadges();
             return;
         }
@@ -228,7 +242,7 @@ internal sealed class CombatOverlayView : IDisposable
             ? _stripHolder.CardModel
             : null;
         var badges = card != null && CombatManager.Instance.IsInProgress
-            ? CountingTracker.ForCardPlay(card.Owner, card)
+            ? CountingTracker.ForCardPlay(card.Owner, card, _projected)
             : [];
         BadgeStrip.SetBadges(_handStrip, badges);
     }

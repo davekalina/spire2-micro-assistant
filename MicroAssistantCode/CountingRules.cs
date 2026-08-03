@@ -150,4 +150,20 @@ public static class CountingRules
     public static CardPlayEffect AllowancePlay(bool cardMatches, int remaining) =>
         !cardMatches ? CardPlayEffect.None :
         remaining > 0 ? CardPlayEffect.Contributes : CardPlayEffect.Breaks;
+
+    // Projected values: what a counter will read after the selected card is played.
+    // Shown in place of the current count while a card is held for play.
+
+    /// <summary>A wrapped counter after one more tick (Pen Nib at 9 reads 0).</summary>
+    public static int NextWrapped(int count, int threshold) => (count + 1) % threshold;
+
+    /// <summary>A count-up counter after one more tick.</summary>
+    public static int NextUp(int count) => count + 1;
+
+    /// <summary>A countdown after spending one.</summary>
+    public static int NextDown(int remaining) => Math.Max(0, remaining - 1);
+
+    /// <summary>A countdown that fires at zero and starts over (Panache).</summary>
+    public static int NextCountdownWithReset(int remaining, int resetTo) =>
+        remaining <= 1 ? resetTo : remaining - 1;
 }

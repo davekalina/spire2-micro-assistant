@@ -24,7 +24,9 @@ is about to do, on two surfaces during combat:
 - **Above the focused hand card** (mouse hover and controller focus both count): a
   centered row of badges — the source's atlas icon with its current count, or X-ed
   out when playing that card would break its condition or miss its window. The
-  strip stays with the card while it is dragged out and played.
+  strip stays with the card while it is dragged out and played, and from the
+  moment the card is held for play the counts switch to **projected values** —
+  what each counter is about to become — in the aqua projection color.
 - **Above the End Turn button**: badges for sources where ending the turn is the
   decision — will/will-NOT verdicts with native hover tips.
 
@@ -51,7 +53,9 @@ The layering that must not regress silently:
   (`DisplayAmountChanged`/`StatusChanged`, `HoveredModelTracker.HoverChanged`,
   `CombatManager` lifecycle, plus the coalesced `StateTracker.CombatStateChanged`
   as the catch-all for power and history changes). No polling, no per-frame work.
-- The only Harmony patches are `NCombatUi._Ready`/`_ExitTree` in `CombatUiPatch`;
+- The Harmony patches are `NCombatUi._Ready`/`_ExitTree` in `CombatUiPatch` and a
+  postfix on the private `NPlayerHand.StartCardPlay` (the one transition no game
+  event covers: hover→play raises no HoverChanged and moves no combat state);
   every game→mod boundary is wrapped in `Guard`. The one private read is the
   hand's `_currentCardPlay` Godot property (with a child-scan fallback) for the
   follow-the-played-card behavior.
@@ -64,7 +68,8 @@ Any directional change must be applied across all of these:
   count badge, X-ed-out badge, bare-icon badge, primed gold count, multi-source
   rows mixing relics and powers);
 - the strip riding a card that is being dragged, targeted, and played (mouse and
-  controller; cancel returns it to hand cleanly);
+  controller; cancel returns it to hand cleanly), including the hover→play flip
+  to aqua projected counts and the flip back on cancel;
 - the badge strip above the End Turn button (active, X-ed out, hidden states; enemy
   turn, when the strip rides the button's slide-out tween);
 - the hover tips on End Turn badges (will / will NOT wording, counts read from the

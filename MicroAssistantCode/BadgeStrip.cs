@@ -95,6 +95,8 @@ internal static class BadgeStrip
             cell.AddChild(BrokenMark());
         else if (badge.CountText != null)
             cell.AddChild(CountLabel(badge));
+        // Projection (the value a counter is about to become) outranks primed gold;
+        // both are decided in CountLabel.
 
         if (badge.Tip is { } tip)
             AttachHoverTip(cell, badge, tip);
@@ -138,7 +140,10 @@ internal static class BadgeStrip
             OffsetRight = 44f,
             OffsetBottom = 44f,
         };
-        Style(label, CountFontSize, badge.Primed ? StsColors.gold : StsColors.cream, outlineSize: 10);
+        var color = badge.Projected ? StsColors.aqua
+            : badge.Primed ? StsColors.gold
+            : StsColors.cream;
+        Style(label, CountFontSize, color, outlineSize: 10);
         return label;
     }
 

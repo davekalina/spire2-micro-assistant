@@ -154,4 +154,26 @@ public class CountingRulesTests
     [InlineData(true, 0, CardPlayEffect.Breaks)]
     public void Allowance_play(bool matches, int remaining, CardPlayEffect expected) =>
         Assert.Equal(expected, CountingRules.AllowancePlay(matches, remaining));
+
+    // Projected values: the number a counter will read after the held card is played.
+    [Theory]
+    [InlineData(5, 10, 6)]
+    [InlineData(9, 10, 0)]
+    [InlineData(2, 3, 0)]
+    public void Next_wrapped(int count, int threshold, int expected) =>
+        Assert.Equal(expected, CountingRules.NextWrapped(count, threshold));
+
+    [Fact]
+    public void Next_up_and_down()
+    {
+        Assert.Equal(4, CountingRules.NextUp(3));
+        Assert.Equal(1, CountingRules.NextDown(2));
+        Assert.Equal(0, CountingRules.NextDown(0));
+    }
+
+    [Theory]
+    [InlineData(3, 2)]
+    [InlineData(1, 5)]
+    public void Next_countdown_with_reset(int remaining, int expected) =>
+        Assert.Equal(expected, CountingRules.NextCountdownWithReset(remaining, resetTo: 5));
 }
