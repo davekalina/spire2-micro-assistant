@@ -18,19 +18,41 @@ pipeline work. Those are platform facts. This file is how I want the work done.
 | Gameplay | Informational only; `affects_gameplay` is `false` |
 | Dependencies | None yet |
 
-> **Fill this in.** Replace the paragraph below with what the mod actually does and which
-> parts must not regress silently, then keep it current. An agent reading only this file
-> should understand the mod's shape without reading the source.
+The mod shows how counting relics react to what the player is about to do, on two
+surfaces during combat:
 
-_No behavior implemented yet._
+- **Above the focused hand card** (mouse hover and controller focus both count): a
+  centered row of relic badges — the relic's atlas icon with its current count, or
+  X-ed out when playing that card would break the relic's condition.
+- **Above the End Turn button**: badges for turn-scoped relics only — Pocketwatch
+  active or X-ed out by cards played this turn, Pendulum only on the turn before it
+  fires. Pen Nib never appears here.
+
+The layering that must not regress silently:
+
+- `CountingRules` is the pure decision logic (game-independent, linked into the test
+  project) — what a card play does to a relic, what belongs above End Turn.
+- `CountingRelicTracker` maps rules onto live relic models, one registry entry per
+  relic (Pocketwatch, Pendulum, Pen Nib). Counts are read from the same members the
+  native relic bar prints (`DisplayAmount`, `TurnsSeen`), never recomputed, so this
+  display cannot drift from the bar.
+- `CombatOverlayView` is event-driven off the signals the native UI repaints on
+  (`DisplayAmountChanged`/`StatusChanged`, `HoveredModelTracker.HoverChanged`,
+  `CombatManager` lifecycle). No polling, no per-frame work.
+- The only Harmony patches are `NCombatUi._Ready`/`_ExitTree` in `CombatUiPatch`;
+  every game→mod boundary is wrapped in `Guard`.
 
 ### Surfaces to audit
 
-> **Fill this in.** List every screen, overlay, control, and state this mod touches. A
-> directional change has to be applied across all of them, and this list is what makes
-> that checkable.
+Any directional change must be applied across all of these:
 
-- _none yet_
+- the badge strip above the focused hand card (mouse hover and controller focus;
+  count badge, X-ed-out badge, primed gold count, multi-relic rows);
+- the badge strip above the End Turn button (active, X-ed out, hidden states; enemy
+  turn, when the strip rides the button's slide-out tween);
+- badge visuals shared by both strips (`RelicBadgeStrip`: icon, count label, X mark);
+- combat lifecycle edges: combat start and end, relic gained or lost mid-combat,
+  relic melted, card played while another card is focused.
 
 ## Mod UI: match the game
 

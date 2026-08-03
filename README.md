@@ -1,8 +1,20 @@
 # Micro Assistant
 
+An informational Slay the Spire 2 mod that shows how your counting relics react to
+what you are about to do.
 
+- Hover or controller-focus a card in hand, and the relics that care about playing it
+  appear above the card — with their current count, or X-ed out if playing the card
+  would break the relic's condition (a fourth card under Pocketwatch).
+- Above the End Turn button, turn-scoped relics show whether ending the turn keeps
+  their payoff: Pocketwatch while its condition still holds (X-ed out once it is
+  lost), Pendulum only on the turn before it fires.
 
-An informational Slay the Spire 2 mod.
+Counts are read from the same values the relic bar prints, so the two never
+disagree. Nothing about the game's behavior changes.
+
+Covered so far: **Pocketwatch**, **Pendulum**, **Pen Nib**. Adding another counting
+relic is one registry entry in `MicroAssistantCode/CountingRelicTracker.cs`.
 
 ## Build
 
