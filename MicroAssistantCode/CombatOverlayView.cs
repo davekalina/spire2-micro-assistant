@@ -23,9 +23,11 @@ internal sealed class CombatOverlayView : IDisposable
 {
     // The hand card holder's origin is the card's center and the card spans
     // y -211..211; the native %HandIndex hotkey label occupies y -288..-224. The
-    // strip is the card's width, centered, in the band just above that label.
-    private const float HandStripTop = -336f;
-    private const float HandStripBottom = -296f;
+    // strip is the card's width, centered, overlapping the top of that label's
+    // band - the digit itself draws lower and the first placement read as
+    // floating too far off the card.
+    private const float HandStripTop = -304f;
+    private const float HandStripBottom = -264f;
     private const float HandStripHalfWidth = 150f;
 
     // The End Turn button root is 220x90 with the multiplayer vote row already at

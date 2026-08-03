@@ -8,7 +8,9 @@ what you are about to do.
   would break the relic's condition (a fourth card under Pocketwatch).
 - Above the End Turn button, turn-scoped relics show whether ending the turn keeps
   their payoff: Pocketwatch while its condition still holds (X-ed out once it is
-  lost), Pendulum only on the turn before it fires.
+  lost), Pendulum only on the turn before it fires. Hovering a badge shows a native
+  tooltip spelling out what will happen — "will draw 3 extra cards next turn" or
+  "will NOT".
 
 Counts are read from the same values the relic bar prints, so the two never
 disagree. Nothing about the game's behavior changes.

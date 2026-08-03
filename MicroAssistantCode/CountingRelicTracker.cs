@@ -5,11 +5,16 @@ using MegaCrit.Sts2.Core.Models.Relics;
 
 namespace MicroAssistant.MicroAssistantCode;
 
+/// <summary>Hover-tip text for a badge; the title is the relic's localized name.</summary>
+internal sealed record BadgeTip(string Title, string Body);
+
 /// <summary>
 /// One icon in a strip: which relic, the count to print on it, and whether it is
 /// drawn X-ed out instead. Primed marks a relic whose very next tick triggers it.
+/// Tip is set only on End Turn badges; hand badges must not catch the mouse.
 /// </summary>
-internal sealed record RelicBadge(RelicModel Relic, int Count, bool Broken, bool Primed);
+internal sealed record RelicBadge(
+    RelicModel Relic, int Count, bool Broken, bool Primed, BadgeTip? Tip = null);
 
 /// <summary>
 /// Which of a player's relics care about a card play or about ending the turn.
@@ -29,7 +34,8 @@ internal static class CountingRelicTracker
         Func<RelicModel, CardModel, CardPlayEffect> PlayEffect,
         Func<RelicModel, EndTurnState> EndTurn,
         Func<RelicModel, int> Count,
-        Func<RelicModel, bool> Primed);
+        Func<RelicModel, bool> Primed,
+        Func<RelicModel, EndTurnState, BadgeTip?> EndTurnTip);
 
     /// <summary>
     /// To teach the mod a new counting relic, add an entry. Decision logic belongs in
@@ -44,7 +50,20 @@ internal static class CountingRelicTracker
             EndTurn: relic =>
                 CountingRules.PocketwatchEndTurn(relic.DisplayAmount, CardThreshold(relic)),
             Count: relic => relic.DisplayAmount,
-            Primed: _ => false),
+            Primed: _ => false,
+            EndTurnTip: (relic, state) =>
+            {
+                var draw = relic.DynamicVars.Cards.IntValue;
+                var threshold = CardThreshold(relic);
+                var played = relic.DisplayAmount;
+                return new BadgeTip(
+                    relic.Title.ToString(),
+                    state == EndTurnState.Active
+                        ? $"Will draw {draw} extra {CardWord(draw)} next turn: " +
+                          $"{played} of at most {threshold} cards played this turn."
+                        : $"Will NOT draw extra cards next turn: {played} cards " +
+                          $"played this turn, more than {threshold}.");
+            }),
 
         // Pendulum ticks at hand draw. TurnsSeen is read directly because DisplayAmount
         // reports the full cycle length during the relic's one-second activation flash.
@@ -54,7 +73,15 @@ internal static class CountingRelicTracker
                 CountingRules.PendulumEndTurn(((Pendulum)relic).TurnsSeen, Turns(relic)),
             Count: relic => ((Pendulum)relic).TurnsSeen,
             Primed: relic =>
-                CountingRules.IsPrimed(((Pendulum)relic).TurnsSeen, Turns(relic))),
+                CountingRules.IsPrimed(((Pendulum)relic).TurnsSeen, Turns(relic)),
+            EndTurnTip: (relic, _) =>
+            {
+                // Only ever shown while Active: the turn before the relic fires.
+                var draw = relic.DynamicVars.Cards.IntValue;
+                return new BadgeTip(
+                    relic.Title.ToString(),
+                    $"Will draw {draw} extra {CardWord(draw)} next turn.");
+            }),
 
         // Pen Nib counts attacks across turns; DisplayAmount is AttacksPlayed mod 10.
         [typeof(PenNib)] = new(
@@ -62,7 +89,8 @@ internal static class CountingRelicTracker
                 CountingRules.PenNibPlay(card.Type == CardType.Attack),
             EndTurn: _ => CountingRules.PenNibEndTurn(),
             Count: relic => relic.DisplayAmount,
-            Primed: relic => CountingRules.IsPrimed(relic.DisplayAmount, PenNibThreshold)),
+            Primed: relic => CountingRules.IsPrimed(relic.DisplayAmount, PenNibThreshold),
+            EndTurnTip: (_, _) => null),
     };
 
     /// <summary>The badges to draw above a hovered card, in relic-bar order.</summary>
@@ -96,7 +124,8 @@ internal static class CountingRelicTracker
                 relic,
                 semantics.Count(relic),
                 Broken: state == EndTurnState.Broken,
-                semantics.Primed(relic)));
+                semantics.Primed(relic),
+                semantics.EndTurnTip(relic, state)));
         }
         return badges;
     }
@@ -118,4 +147,6 @@ internal static class CountingRelicTracker
         relic.DynamicVars["CardThreshold"].IntValue;
 
     private static int Turns(RelicModel relic) => relic.DynamicVars["Turns"].IntValue;
+
+    private static string CardWord(int count) => count == 1 ? "card" : "cards";
 }

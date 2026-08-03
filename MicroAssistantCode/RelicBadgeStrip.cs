@@ -1,5 +1,9 @@
+using System.Reflection;
 using Godot;
 using MegaCrit.Sts2.Core.Helpers;
+using MegaCrit.Sts2.Core.HoverTips;
+using MegaCrit.Sts2.Core.Localization;
+using MegaCrit.Sts2.Core.Nodes.HoverTips;
 using MegaCrit.Sts2.addons.mega_text;
 
 namespace MicroAssistant.MicroAssistantCode;
@@ -25,8 +29,21 @@ internal static class RelicBadgeStrip
     private static readonly Color CountShadow = new(0f, 0f, 0f, 0.188235f);
     private static readonly Color CountOutline = new(0.12f, 0.10208f, 0.0816f);
 
-    private const int BrokenFontSize = 34;
-    private static readonly Color BrokenDim = new(0.5f, 0.5f, 0.5f);
+    // The X is translucent and lightly outlined so the relic icon stays readable
+    // under it; the icon itself is not dimmed.
+    private const int BrokenFontSize = 30;
+    private static readonly Color BrokenRed = new(
+        StsColors.red.R, StsColors.red.G, StsColors.red.B, 0.8f);
+
+    // HoverTip's Title and Description only have private setters; the seed LocString
+    // is discarded once both are overwritten. Same approach Hypergeo ships.
+    private static readonly PropertyInfo TipTitle =
+        typeof(HoverTip).GetProperty(nameof(HoverTip.Title)) ??
+        throw new MissingMemberException(typeof(HoverTip).FullName, nameof(HoverTip.Title));
+    private static readonly PropertyInfo TipDescription =
+        typeof(HoverTip).GetProperty(nameof(HoverTip.Description)) ??
+        throw new MissingMemberException(
+            typeof(HoverTip).FullName, nameof(HoverTip.Description));
 
     /// <summary>An empty strip; position and size are the caller's to set.</summary>
     public static HBoxContainer CreateContainer(string name)
@@ -75,15 +92,34 @@ internal static class RelicBadgeStrip
         cell.AddChild(icon);
 
         if (badge.Broken)
-        {
-            icon.Modulate = BrokenDim;
             cell.AddChild(BrokenMark());
-        }
         else
-        {
             cell.AddChild(CountLabel(badge));
-        }
+
+        if (badge.Tip is { } tip)
+            AttachHoverTip(cell, badge, tip);
         return cell;
+    }
+
+    /// <summary>
+    /// A native hover tip on the badge. The cell starts catching the mouse for it,
+    /// which is safe only where the strip floats over empty background — never on a
+    /// badge above a hand card, where it would steal the card's own hover.
+    /// </summary>
+    private static void AttachHoverTip(Control cell, RelicBadge badge, BadgeTip tip)
+    {
+        cell.MouseFilter = Control.MouseFilterEnum.Stop;
+        cell.MouseEntered += () => Guard.Run("Showing a badge hover tip", () =>
+        {
+            object boxed = new HoverTip(new LocString("gameplay_ui", "DRAW_PILE_INFO"));
+            TipTitle.SetValue(boxed, tip.Title);
+            TipDescription.SetValue(boxed, tip.Body);
+            var hoverTip = (HoverTip)boxed;
+            hoverTip.Id = $"{MainFile.ModId}.{badge.Relic.Id.Entry}";
+            NHoverTipSet.CreateAndShow(cell, hoverTip, HoverTipAlignment.Left);
+        });
+        cell.MouseExited += () => Guard.Run("Hiding a badge hover tip", () =>
+            NHoverTipSet.Remove(cell));
     }
 
     private static MegaLabel CountLabel(RelicBadge badge)
@@ -119,7 +155,7 @@ internal static class RelicBadgeStrip
             OffsetRight = IconSize,
             OffsetBottom = IconSize,
         };
-        Style(label, BrokenFontSize, StsColors.red, outlineSize: 12);
+        Style(label, BrokenFontSize, BrokenRed, outlineSize: 6);
         return label;
     }
 

@@ -50,6 +50,8 @@ Any directional change must be applied across all of these:
   count badge, X-ed-out badge, primed gold count, multi-relic rows);
 - the badge strip above the End Turn button (active, X-ed out, hidden states; enemy
   turn, when the strip rides the button's slide-out tween);
+- the hover tips on End Turn badges (will / will NOT wording, counts read from the
+  relic's DynamicVars; hand badges must never catch the mouse and get no tips);
 - badge visuals shared by both strips (`RelicBadgeStrip`: icon, count label, X mark);
 - combat lifecycle edges: combat start and end, relic gained or lost mid-combat,
   relic melted, card played while another card is focused.
