@@ -54,15 +54,11 @@ internal static class CountingRelicTracker
             EndTurnTip: (relic, state) =>
             {
                 var draw = relic.DynamicVars.Cards.IntValue;
-                var threshold = CardThreshold(relic);
-                var played = relic.DisplayAmount;
                 return new BadgeTip(
-                    relic.Title.ToString(),
+                    Title(relic),
                     state == EndTurnState.Active
-                        ? $"Will draw {draw} extra {CardWord(draw)} next turn: " +
-                          $"{played} of at most {threshold} cards played this turn."
-                        : $"Will NOT draw extra cards next turn: {played} cards " +
-                          $"played this turn, more than {threshold}.");
+                        ? $"Will draw {draw} extra {CardWord(draw)} next turn."
+                        : "Will NOT draw extra cards next turn.");
             }),
 
         // Pendulum ticks at hand draw. TurnsSeen is read directly because DisplayAmount
@@ -79,7 +75,7 @@ internal static class CountingRelicTracker
                 // Only ever shown while Active: the turn before the relic fires.
                 var draw = relic.DynamicVars.Cards.IntValue;
                 return new BadgeTip(
-                    relic.Title.ToString(),
+                    Title(relic),
                     $"Will draw {draw} extra {CardWord(draw)} next turn.");
             }),
 
@@ -149,4 +145,10 @@ internal static class CountingRelicTracker
     private static int Turns(RelicModel relic) => relic.DynamicVars["Turns"].IntValue;
 
     private static string CardWord(int count) => count == 1 ? "card" : "cards";
+
+    /// <summary>
+    /// The relic's localized name. LocString.ToString is a debug representation
+    /// ("LocString table relics entry ..."); GetFormattedText is the resolver.
+    /// </summary>
+    private static string Title(RelicModel relic) => relic.Title.GetFormattedText();
 }
