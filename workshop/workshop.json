@@ -1,6 +1,6 @@
 {
-  "title": "__MOD_NAME__",
-  "description": "__MOD_DESCRIPTION__",
+  "title": "Micro Assistant",
+  "description": "Shows which counting relics each card play affects, on the card and by the End Turn button.",
   "visibility": "private",
   "changeNote": "Initial release.",
   "tags": [],

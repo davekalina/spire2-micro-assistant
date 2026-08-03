@@ -1,7 +1,7 @@
-using __MOD_ID__.__MOD_ID__Code;
+using MicroAssistant.MicroAssistantCode;
 using Xunit;
 
-namespace __MOD_ID__.Tests;
+namespace MicroAssistant.Tests;
 
 public class ExampleTests
 {

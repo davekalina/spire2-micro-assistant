@@ -1,4 +1,4 @@
-# __MOD_NAME__
+# Micro Assistant
 
 @AGENTS.md
 @docs/sts2-modding.md
