@@ -2,7 +2,7 @@
   "title": "Micro Assistant",
   "description": "Shows which counting relics and powers each card play affects - on the hovered card, and above the End Turn button.",
   "visibility": "unlisted",
-  "changeNote": "v0.4.1: diagnostic build - logs a few one-time [diag] INFO lines to trace why badges may not appear on some setups. No behavior changes.",
+  "changeNote": "v0.5.1: badges draw above the targeting arrow; while a card is held for play, the icons of anything it will set off appear on a tooltip-backed banner near the top of the screen; hand badges sit on a tooltip backing for legibility.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
