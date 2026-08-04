@@ -38,10 +38,21 @@ internal sealed class CombatOverlayView : IDisposable
     private const float EndTurnStripTop = -64f;
     private const float EndTurnStripBottom = -24f;
 
+    // While a card is held for play, the targeting arrow (GlobalUi, z of its source
+    // control + 1) would draw over the strip. This absolute z outranks it, and is
+    // applied only in that state so the strip can never punch through the overlay
+    // screens during normal hover.
+    private const int InPlayZ = 50;
+
+    // The trigger banner sits centered at 20% down the screen ("80% of the way up").
+    private const float BannerAnchorY = 0.2f;
+    private const float BannerHalfHeight = 28f;
+
     private readonly NCombatUi _ui;
     private readonly List<RelicModel> _subscribedRelics = [];
     private HBoxContainer? _endTurnStrip;
     private HBoxContainer? _handStrip;
+    private HBoxContainer? _triggerBanner;
 
     /// <summary>The holder the hand strip rides: the focused card, or the one in play.</summary>
     private NHandCardHolder? _stripHolder;
@@ -64,6 +75,20 @@ internal sealed class CombatOverlayView : IDisposable
         // slide out on enemy turns. The hover animation moves only the button's
         // Visuals child, so the strip does not jitter with it.
         _ui.EndTurnButton.AddChild(_endTurnStrip);
+
+        // Full-width so its centered content needs no measuring; only visible while
+        // a play in progress will set something off, which is also why its absolute
+        // z (over the targeting arrow) is safe to leave on permanently.
+        _triggerBanner = BadgeStrip.CreateTriggerBanner("MicroAssistantTriggerBanner");
+        _triggerBanner.AnchorLeft = 0f;
+        _triggerBanner.AnchorRight = 1f;
+        _triggerBanner.AnchorTop = BannerAnchorY;
+        _triggerBanner.AnchorBottom = BannerAnchorY;
+        _triggerBanner.OffsetTop = -BannerHalfHeight;
+        _triggerBanner.OffsetBottom = BannerHalfHeight;
+        _triggerBanner.ZAsRelative = false;
+        _triggerBanner.ZIndex = InPlayZ;
+        _ui.AddChild(_triggerBanner);
 
         CombatManager.Instance.CombatBegan += OnCombatBegan;
         CombatManager.Instance.CombatEnded += OnCombatEnded;
@@ -92,6 +117,7 @@ internal sealed class CombatOverlayView : IDisposable
         UnbindPlayer();
         FreeStrip(ref _handStrip);
         FreeStrip(ref _endTurnStrip);
+        FreeStrip(ref _triggerBanner);
         _stripHolder = null;
     }
 
@@ -232,7 +258,10 @@ internal sealed class CombatOverlayView : IDisposable
         FreeStrip(ref _handStrip);
         _stripHolder = holder;
         if (holder == null)
+        {
+            UpdateTriggerBanner([]);
             return;
+        }
 
         // Parented to the holder, the strip rides the card's pop-up motion and is
         // freed with it. The focused holder is unrotated at scale one, so these
@@ -249,7 +278,10 @@ internal sealed class CombatOverlayView : IDisposable
     private void RefreshHandBadges()
     {
         if (_handStrip == null || !GodotObject.IsInstanceValid(_handStrip))
+        {
+            UpdateTriggerBanner([]);
             return;
+        }
         var card = _stripHolder != null && GodotObject.IsInstanceValid(_stripHolder)
             ? _stripHolder.CardModel
             : null;
@@ -259,7 +291,23 @@ internal sealed class CombatOverlayView : IDisposable
         Diag.Once("hand", () =>
             $"Hand strip refreshed: {badges.Count} badge(s) for " +
             $"{card?.Id.Entry ?? "no card"}.");
+        // Above the targeting arrow only while a card is in play; relative z while
+        // merely hovering, so overlays keep drawing over the strip.
+        _handStrip.ZAsRelative = !_projected;
+        _handStrip.ZIndex = _projected ? InPlayZ : 0;
         BadgeStrip.SetBadges(_handStrip, badges);
+        UpdateTriggerBanner(badges);
+    }
+
+    /// <summary>The banner speaks only while a play in progress will set something off.</summary>
+    private void UpdateTriggerBanner(IReadOnlyList<SourceBadge> badges)
+    {
+        if (_triggerBanner == null || !GodotObject.IsInstanceValid(_triggerBanner))
+            return;
+        var triggering = _projected
+            ? badges.Where(badge => badge.WillTrigger).ToList()
+            : [];
+        BadgeStrip.SetTriggerIcons(_triggerBanner, triggering);
     }
 
     /// <summary>

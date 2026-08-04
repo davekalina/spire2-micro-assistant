@@ -9,7 +9,9 @@ powers react to what you are about to do.
   under Art of War) or miss their window (a card past Echo Form's doublings). The
   row stays with the card while you drag it out and play it — and once the card is
   held for play, counts turn aqua and show what each counter is **about to
-  become** (Tuning Fork at 5 reads 6; Pen Nib at 9 reads 0 as it fires).
+  become** (Tuning Fork at 5 reads 6; Pen Nib at 9 reads 0 as it fires), and if
+  the play will set something off, a bold **"Triggers"** banner with the icons
+  appears near the top of the screen.
 - Above the End Turn button, sources for which ending the turn is the decision show
   a will/will-NOT verdict: Pocketwatch, Art of War, Ripple Basin, Orichalcum,
   Pendulum and the other turn tickers, Pael's Eye, Pale Blue Dot. Hovering a badge

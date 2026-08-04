@@ -15,12 +15,14 @@ internal sealed record BadgeTip(string Title, string Body);
 /// One icon in a strip. CountText is printed on the icon when present; Broken draws
 /// an X instead. Primed colors the count gold: the very next tick triggers the
 /// source. Projected colors it aqua: the card is held for play and the number is
-/// what the counter is about to become, not what it is. Tip is set only on End
-/// Turn badges; hand badges must not catch the mouse.
+/// what the counter is about to become, not what it is. WillTrigger marks a badge
+/// whose source fires on (or applies its effect to) this very play — the trigger
+/// banner is built from these. Tip is set only on End Turn badges; hand badges
+/// must not catch the mouse.
 /// </summary>
 internal sealed record SourceBadge(
     Texture2D Icon, string Id, string? CountText, bool Broken, bool Primed,
-    bool Projected = false, BadgeTip? Tip = null);
+    bool Projected = false, bool WillTrigger = false, BadgeTip? Tip = null);
 
 /// <summary>
 /// Which counting sources — relics and powers — care about a card play or about
@@ -55,7 +57,8 @@ internal static class CountingTracker
         Func<PowerModel, Player, string?> CountText,
         Func<PowerModel, Player, bool> Primed,
         Func<PowerModel, Player, EndTurnState, BadgeTip?> EndTurnTip,
-        Func<PowerModel, Player, string>? NextCount = null);
+        Func<PowerModel, Player, string>? NextCount = null,
+        bool TriggersWhileContributing = false);
 
     private static readonly Dictionary<Type, RelicSemantics> Relics = new()
     {
@@ -393,13 +396,18 @@ internal static class CountingTracker
             var next = projected && effect == CardPlayEffect.Contributes
                 ? semantics.NextCount?.Invoke(relic)
                 : null;
+            // A counter fires on this play when it is primed; an armed first-X
+            // source (bare icon, no count) fires on any matching play.
+            var willTrigger = effect == CardPlayEffect.Contributes &&
+                (semantics.Primed(relic) || semantics.CountText(relic) == null);
             badges.Add(new SourceBadge(
                 relic.Icon,
                 relic.Id.Entry,
                 next ?? semantics.CountText(relic),
                 Broken: effect == CardPlayEffect.Breaks,
                 Primed: next == null && semantics.Primed(relic),
-                Projected: next != null));
+                Projected: next != null,
+                WillTrigger: willTrigger));
         }
         foreach (var (power, semantics) in TrackedPowerPairs(player))
         {
@@ -409,13 +417,18 @@ internal static class CountingTracker
             var next = projected && effect == CardPlayEffect.Contributes
                 ? semantics.NextCount?.Invoke(power, player)
                 : null;
+            var willTrigger = effect == CardPlayEffect.Contributes &&
+                (semantics.Primed(power, player) ||
+                 semantics.CountText(power, player) == null ||
+                 semantics.TriggersWhileContributing);
             badges.Add(new SourceBadge(
                 power.Icon,
                 power.Id.Entry,
                 next ?? semantics.CountText(power, player),
                 Broken: effect == CardPlayEffect.Breaks,
                 Primed: next == null && semantics.Primed(power, player),
-                Projected: next != null));
+                Projected: next != null,
+                WillTrigger: willTrigger));
         }
         return badges;
     }
@@ -523,7 +536,10 @@ internal static class CountingTracker
         Primed: (power, player) => power.Amount - used(power, player) == 1,
         EndTurnTip: (_, _, _) => null,
         NextCount: (power, player) =>
-            CountingRules.NextDown(power.Amount - used(power, player)).ToString());
+            CountingRules.NextDown(power.Amount - used(power, player)).ToString(),
+        // An allowance applies its effect to every contributing play — this card
+        // WILL be doubled / free / redirected — not only to the one that empties it.
+        TriggersWhileContributing: true);
 
     /// <summary>Once-per-turn firsts: the bare icon while armed, X once spent.</summary>
     private static PowerSemantics FirstEachTurn(

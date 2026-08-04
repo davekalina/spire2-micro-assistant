@@ -45,6 +45,55 @@ internal static class BadgeStrip
         throw new MissingMemberException(
             typeof(HoverTip).FullName, nameof(HoverTip.Description));
 
+    private const int BannerFontSize = 34;
+    private const float BannerIconSize = 40f;
+
+    /// <summary>
+    /// The "Triggers [icons]" banner row: a bold gold word in the game's combat
+    /// lettering followed by the icons of the sources this play sets off. Content
+    /// is filled by SetTriggerIcons; an empty icon list hides it.
+    /// </summary>
+    public static HBoxContainer CreateTriggerBanner(string name)
+    {
+        var banner = CreateContainer(name);
+        banner.AddThemeConstantOverride("separation", 8);
+        banner.Visible = false;
+        return banner;
+    }
+
+    /// <summary>Rebuild the banner for these badges; hidden when none trigger.</summary>
+    public static void SetTriggerIcons(HBoxContainer banner, IReadOnlyList<SourceBadge> triggering)
+    {
+        foreach (var child in banner.GetChildren())
+        {
+            banner.RemoveChild(child);
+            child.QueueFree();
+        }
+        banner.Visible = triggering.Count > 0;
+        if (triggering.Count == 0)
+            return;
+
+        var word = new MegaLabel
+        {
+            Text = "Triggers",
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            AutoSizeEnabled = false,
+        };
+        Style(word, BannerFontSize, StsColors.gold, outlineSize: 12);
+        banner.AddChild(word);
+
+        foreach (var badge in triggering)
+            banner.AddChild(new TextureRect
+            {
+                Texture = badge.Icon,
+                CustomMinimumSize = new Vector2(BannerIconSize, BannerIconSize),
+                ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                MouseFilter = Control.MouseFilterEnum.Ignore,
+            });
+    }
+
     /// <summary>An empty strip; position and size are the caller's to set.</summary>
     public static HBoxContainer CreateContainer(string name)
     {

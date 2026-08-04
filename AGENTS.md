@@ -69,7 +69,12 @@ Any directional change must be applied across all of these:
   rows mixing relics and powers);
 - the strip riding a card that is being dragged, targeted, and played (mouse and
   controller; cancel returns it to hand cleanly), including the hover→play flip
-  to aqua projected counts and the flip back on cancel;
+  to aqua projected counts and the flip back on cancel, and the in-play absolute
+  z that keeps badges above the targeting arrow (relative z on plain hover so
+  overlay screens still cover the strip);
+- the "Triggers [icons]" banner (top-center at 20% down the screen; visible only
+  while a play in progress will fire a source: primed counters, armed first-X
+  sources, active allowances);
 - the badge strip above the End Turn button (active, X-ed out, hidden states; enemy
   turn, when the strip rides the button's slide-out tween);
 - the hover tips on End Turn badges (will / will NOT wording, counts read from the
