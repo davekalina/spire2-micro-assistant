@@ -110,11 +110,16 @@ internal sealed class CombatOverlayView : IDisposable
         Guard.Run("Refreshing the End Turn badges on turn change", RefreshEndTurn);
 
     private void OnHoverChanged(ulong _) =>
-        Guard.Run("Following the focused hand card", SyncHandStrip);
+        Guard.Run("Following the focused hand card", () =>
+        {
+            Diag.Once("hover", () => "Hover event received.");
+            SyncHandStrip();
+        });
 
     private void OnCombatStateChanged(CombatState _) =>
         Guard.Run("Refreshing badges on combat state change", () =>
         {
+            Diag.Once("statechange", () => "Combat state change received.");
             RefreshEndTurn();
             SyncHandStrip();
         });
@@ -139,6 +144,10 @@ internal sealed class CombatOverlayView : IDisposable
     {
         UnbindPlayer();
         _player = LocalContext.GetMe(state);
+        Diag.Once("bind", () => _player == null
+            ? "Combat began but the local player was NOT resolved; End Turn badges stay empty."
+            : $"Bound to combat: {CountingTracker.TrackedRelics(_player).Count()} tracked relic(s) " +
+              $"among {_player.Relics.Count}.");
         if (_player == null)
             return;
         _player.RelicObtained += OnRelicListChanged;
@@ -187,6 +196,9 @@ internal sealed class CombatOverlayView : IDisposable
         var badges = _player != null && CombatManager.Instance.IsInProgress
             ? CountingTracker.ForEndTurn(_player)
             : [];
+        Diag.Once("endturn", () =>
+            $"End Turn strip refreshed: {badges.Count} badge(s), " +
+            $"player {(_player == null ? "unbound" : "bound")}.");
         BadgeStrip.SetBadges(_endTurnStrip, badges);
     }
 
@@ -244,6 +256,9 @@ internal sealed class CombatOverlayView : IDisposable
         var badges = card != null && CombatManager.Instance.IsInProgress
             ? CountingTracker.ForCardPlay(card.Owner, card, _projected)
             : [];
+        Diag.Once("hand", () =>
+            $"Hand strip refreshed: {badges.Count} badge(s) for " +
+            $"{card?.Id.Entry ?? "no card"}.");
         BadgeStrip.SetBadges(_handStrip, badges);
     }
 
