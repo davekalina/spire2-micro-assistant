@@ -45,18 +45,22 @@ internal static class BadgeStrip
         throw new MissingMemberException(
             typeof(HoverTip).FullName, nameof(HoverTip.Description));
 
-    private const int BannerFontSize = 34;
     private const float BannerIconSize = 40f;
 
+    // The native tooltip backing: images/ui/hover_tip.png as a nine-patch, with a
+    // 25% black copy offset behind it as the shadow, inside a MarginContainer whose
+    // content margins match the art's borders. Straight from ui/hover_tip.tscn.
+    private const string BackingTexturePath = "res://images/ui/hover_tip.png";
+    private static readonly Rect2 BackingRegion = new(0f, 0f, 339f, 107f);
+    private static readonly Rect2 BackingShadowRegion = new(-8f, -8f, 339f, 107f);
+
     /// <summary>
-    /// The "Triggers [icons]" banner row: a bold gold word in the game's combat
-    /// lettering followed by the icons of the sources this play sets off. Content
-    /// is filled by SetTriggerIcons; an empty icon list hides it.
+    /// The trigger banner row: the icons of the sources this play sets off, on a
+    /// tooltip backing. Content is filled by SetTriggerIcons; empty hides it.
     /// </summary>
     public static HBoxContainer CreateTriggerBanner(string name)
     {
         var banner = CreateContainer(name);
-        banner.AddThemeConstantOverride("separation", 8);
         banner.Visible = false;
         return banner;
     }
@@ -73,18 +77,14 @@ internal static class BadgeStrip
         if (triggering.Count == 0)
             return;
 
-        var word = new MegaLabel
+        var icons = new HBoxContainer
         {
-            Text = "Triggers",
-            VerticalAlignment = VerticalAlignment.Center,
+            Alignment = BoxContainer.AlignmentMode.Center,
             MouseFilter = Control.MouseFilterEnum.Ignore,
-            AutoSizeEnabled = false,
         };
-        Style(word, BannerFontSize, StsColors.gold, outlineSize: 12);
-        banner.AddChild(word);
-
+        icons.AddThemeConstantOverride("separation", 8);
         foreach (var badge in triggering)
-            banner.AddChild(new TextureRect
+            icons.AddChild(new TextureRect
             {
                 Texture = badge.Icon,
                 CustomMinimumSize = new Vector2(BannerIconSize, BannerIconSize),
@@ -92,7 +92,51 @@ internal static class BadgeStrip
                 StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                 MouseFilter = Control.MouseFilterEnum.Ignore,
             });
+        banner.AddChild(BackedPanel(icons));
     }
+
+    /// <summary>
+    /// The native tooltip's backing sandwich around some content: shadow and
+    /// nine-patch filling a MarginContainer, content inset by the art's borders.
+    /// </summary>
+    private static Control BackedPanel(Control content)
+    {
+        var panel = new MarginContainer
+        {
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            // The nine-patch corners need this much room to render undistorted.
+            CustomMinimumSize = new Vector2(146f, 75f),
+        };
+        // hover_tip.tscn lets the art overhang the layout box a little.
+        panel.AddThemeConstantOverride("margin_right", -8);
+        panel.AddThemeConstantOverride("margin_bottom", -8);
+        panel.AddChild(BackingPatch(BackingShadowRegion, new Color(0f, 0f, 0f, 0.25098f)));
+        panel.AddChild(BackingPatch(BackingRegion, Colors.White));
+
+        var inset = new MarginContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        inset.AddThemeConstantOverride("margin_left", 22);
+        inset.AddThemeConstantOverride("margin_top", 16);
+        inset.AddThemeConstantOverride("margin_right", 45);
+        inset.AddThemeConstantOverride("margin_bottom", 28);
+        inset.AddChild(content);
+        panel.AddChild(inset);
+        return panel;
+    }
+
+    private static NinePatchRect BackingPatch(Rect2 region, Color modulate) => new()
+    {
+        // Loaded per build rather than cached in a static; see Style's note.
+        Texture = ResourceLoader.Load<Texture2D>(BackingTexturePath),
+        RegionRect = region,
+        Modulate = modulate,
+        PatchMarginLeft = 55,
+        PatchMarginTop = 43,
+        PatchMarginRight = 91,
+        PatchMarginBottom = 32,
+        AxisStretchHorizontal = NinePatchRect.AxisStretchMode.Tile,
+        AxisStretchVertical = NinePatchRect.AxisStretchMode.Tile,
+        MouseFilter = Control.MouseFilterEnum.Ignore,
+    };
 
     /// <summary>An empty strip; position and size are the caller's to set.</summary>
     public static HBoxContainer CreateContainer(string name)
@@ -107,8 +151,13 @@ internal static class BadgeStrip
         return strip;
     }
 
-    /// <summary>Replace the strip's badges. An empty list leaves the strip blank.</summary>
-    public static void SetBadges(HBoxContainer strip, IReadOnlyList<SourceBadge> badges)
+    /// <summary>
+    /// Replace the strip's badges. An empty list leaves the strip blank. With
+    /// <paramref name="backed" /> the row sits on the native tooltip backing — for
+    /// strips that float over busy art rather than on an existing panel.
+    /// </summary>
+    public static void SetBadges(
+        HBoxContainer strip, IReadOnlyList<SourceBadge> badges, bool backed = false)
     {
         foreach (var child in strip.GetChildren())
         {
@@ -117,8 +166,23 @@ internal static class BadgeStrip
             strip.RemoveChild(child);
             child.QueueFree();
         }
+        if (badges.Count == 0)
+            return;
+        if (!backed)
+        {
+            foreach (var badge in badges)
+                strip.AddChild(CreateBadge(badge));
+            return;
+        }
+        var row = new HBoxContainer
+        {
+            Alignment = BoxContainer.AlignmentMode.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        row.AddThemeConstantOverride("separation", 4);
         foreach (var badge in badges)
-            strip.AddChild(CreateBadge(badge));
+            row.AddChild(CreateBadge(badge));
+        strip.AddChild(BackedPanel(row));
     }
 
     private static Control CreateBadge(SourceBadge badge)

@@ -23,10 +23,9 @@ internal sealed class CombatOverlayView : IDisposable
 {
     // The hand card holder's origin is the card's center and the card spans
     // y -211..211; the native %HandIndex hotkey label occupies y -288..-224. The
-    // strip is the card's width, centered, overlapping the top of that label's
-    // band - the digit itself draws lower and the first placement read as
-    // floating too far off the card.
-    private const float HandStripTop = -304f;
+    // strip's bottom edge stays where the bare icons sat; the tooltip backing
+    // grows the band upward from there so the hotkey digit stays uncovered.
+    private const float HandStripTop = -348f;
     private const float HandStripBottom = -264f;
     private const float HandStripHalfWidth = 150f;
 
@@ -46,7 +45,7 @@ internal sealed class CombatOverlayView : IDisposable
 
     // The trigger banner sits centered at 20% down the screen ("80% of the way up").
     private const float BannerAnchorY = 0.2f;
-    private const float BannerHalfHeight = 28f;
+    private const float BannerHalfHeight = 42f;
 
     private readonly NCombatUi _ui;
     private readonly List<RelicModel> _subscribedRelics = [];
@@ -295,7 +294,7 @@ internal sealed class CombatOverlayView : IDisposable
         // merely hovering, so overlays keep drawing over the strip.
         _handStrip.ZAsRelative = !_projected;
         _handStrip.ZIndex = _projected ? InPlayZ : 0;
-        BadgeStrip.SetBadges(_handStrip, badges);
+        BadgeStrip.SetBadges(_handStrip, badges, backed: true);
         UpdateTriggerBanner(badges);
     }
 
