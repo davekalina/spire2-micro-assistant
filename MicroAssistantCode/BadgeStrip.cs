@@ -154,10 +154,13 @@ internal static class BadgeStrip
     /// <summary>
     /// Replace the strip's badges. An empty list leaves the strip blank. With
     /// <paramref name="backed" /> the row sits on the native tooltip backing — for
-    /// strips that float over busy art rather than on an existing panel.
+    /// strips that float over busy art rather than on an existing panel. Scale
+    /// multiplies every badge metric (Big &amp; Bold doubles it); a prefix becomes a
+    /// leading label, used to absorb the native hand-count digit.
     /// </summary>
     public static void SetBadges(
-        HBoxContainer strip, IReadOnlyList<SourceBadge> badges, bool backed = false)
+        HBoxContainer strip, IReadOnlyList<SourceBadge> badges, bool backed = false,
+        float scale = 1f, string? prefix = null)
     {
         foreach (var child in strip.GetChildren())
         {
@@ -168,28 +171,40 @@ internal static class BadgeStrip
         }
         if (badges.Count == 0)
             return;
-        if (!backed)
+
+        var row = backed
+            ? new HBoxContainer
+            {
+                Alignment = BoxContainer.AlignmentMode.Center,
+                MouseFilter = Control.MouseFilterEnum.Ignore,
+            }
+            : strip;
+        if (!ReferenceEquals(row, strip))
+            row.AddThemeConstantOverride("separation", (int)(4 * scale));
+
+        if (prefix != null)
         {
-            foreach (var badge in badges)
-                strip.AddChild(CreateBadge(badge));
-            return;
+            var lead = new MegaLabel
+            {
+                Text = prefix,
+                VerticalAlignment = VerticalAlignment.Center,
+                MouseFilter = Control.MouseFilterEnum.Ignore,
+                AutoSizeEnabled = false,
+            };
+            Style(lead, (int)(26 * scale), StsColors.cream, (int)(8 * scale));
+            row.AddChild(lead);
         }
-        var row = new HBoxContainer
-        {
-            Alignment = BoxContainer.AlignmentMode.Center,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        };
-        row.AddThemeConstantOverride("separation", 4);
         foreach (var badge in badges)
-            row.AddChild(CreateBadge(badge));
-        strip.AddChild(BackedPanel(row));
+            row.AddChild(CreateBadge(badge, scale));
+        if (!ReferenceEquals(row, strip))
+            strip.AddChild(BackedPanel(row));
     }
 
-    private static Control CreateBadge(SourceBadge badge)
+    private static Control CreateBadge(SourceBadge badge, float scale = 1f)
     {
         var cell = new Control
         {
-            CustomMinimumSize = CellSize,
+            CustomMinimumSize = CellSize * scale,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
 
@@ -199,15 +214,15 @@ internal static class BadgeStrip
             ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
             MouseFilter = Control.MouseFilterEnum.Ignore,
-            OffsetRight = IconSize,
-            OffsetBottom = IconSize,
+            OffsetRight = IconSize * scale,
+            OffsetBottom = IconSize * scale,
         };
         cell.AddChild(icon);
 
         if (badge.Broken)
-            cell.AddChild(BrokenMark());
+            cell.AddChild(BrokenMark(scale));
         else if (badge.CountText != null)
-            cell.AddChild(CountLabel(badge));
+            cell.AddChild(CountLabel(badge, scale));
         // Projection (the value a counter is about to become) outranks primed gold;
         // both are decided in CountLabel.
 
@@ -237,7 +252,7 @@ internal static class BadgeStrip
             NHoverTipSet.Remove(cell));
     }
 
-    private static MegaLabel CountLabel(SourceBadge badge)
+    private static MegaLabel CountLabel(SourceBadge badge, float scale)
     {
         var label = new MegaLabel
         {
@@ -248,20 +263,20 @@ internal static class BadgeStrip
             AutoSizeEnabled = false,
             // power.tscn's %AmountLabel offsets: a wide right-aligned band whose
             // right edge sits just off the icon's bottom-right corner.
-            OffsetLeft = -56f,
-            OffsetTop = 21f,
-            OffsetRight = 44f,
-            OffsetBottom = 44f,
+            OffsetLeft = -56f * scale,
+            OffsetTop = 21f * scale,
+            OffsetRight = 44f * scale,
+            OffsetBottom = 44f * scale,
         };
         var color = badge.Projected ? StsColors.aqua
             : badge.Primed ? StsColors.gold
             : StsColors.cream;
-        Style(label, CountFontSize, color, outlineSize: 10);
+        Style(label, (int)(CountFontSize * scale), color, (int)(10 * scale));
         return label;
     }
 
     /// <summary>The X for a play that would break the source, centered over the icon.</summary>
-    private static MegaLabel BrokenMark()
+    private static MegaLabel BrokenMark(float scale)
     {
         var label = new MegaLabel
         {
@@ -270,10 +285,10 @@ internal static class BadgeStrip
             VerticalAlignment = VerticalAlignment.Center,
             MouseFilter = Control.MouseFilterEnum.Ignore,
             AutoSizeEnabled = false,
-            OffsetRight = IconSize,
-            OffsetBottom = IconSize,
+            OffsetRight = IconSize * scale,
+            OffsetBottom = IconSize * scale,
         };
-        Style(label, BrokenFontSize, BrokenRed, outlineSize: 6);
+        Style(label, (int)(BrokenFontSize * scale), BrokenRed, (int)(6 * scale));
         return label;
     }
 

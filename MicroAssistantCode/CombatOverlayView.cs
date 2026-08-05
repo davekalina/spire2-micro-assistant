@@ -3,6 +3,7 @@ using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Rooms;
@@ -11,31 +12,43 @@ using MegaCrit.Sts2.Core.Runs;
 namespace MicroAssistant.MicroAssistantCode;
 
 /// <summary>
-/// The two badge strips of one combat: above the focused hand card, and above the
-/// End Turn button. Created when the combat UI readies, disposed when it leaves.
+/// The badge surfaces of one combat: strips over hand cards, the End Turn display,
+/// and the top-center panel — with placement and multiplicity steered live by the
+/// ViewOptions switches. Created when the combat UI readies, disposed when it
+/// leaves.
 ///
 /// Everything is event-driven off the same signals the native UI repaints on —
 /// relic DisplayAmountChanged/StatusChanged for counts, HoveredModelTracker for the
 /// focused card (which both mouse hover and controller focus feed), CombatManager
-/// for lifecycle. No polling, no per-frame work.
+/// for lifecycle, the coalesced CombatStateChanged as the catch-all. No polling,
+/// no per-frame work.
 /// </summary>
 internal sealed class CombatOverlayView : IDisposable
 {
-    // The hand card holder's origin is the card's center and the card spans
-    // y -211..211; the native %HandIndex hotkey label occupies y -288..-224. The
-    // strip's bottom edge stays where the bare icons sat; the tooltip backing
-    // grows the band upward from there so the hotkey digit stays uncovered.
+    // Hand strip bands, in holder-local space (origin = card center, card spans
+    // y -211..211, the native %HandIndex hotkey digit occupies y -288..-224):
+    // - Default: bottom edge fixed just above the digit, backing grows upward.
+    // - CardOverlay: centered on Hypergeo's proven on-art band (center y -88).
+    // - ReplaceCardCount: dropped onto the digit's own spot, which the strip
+    //   absorbs as a "N." prefix while the digit itself is hidden.
     private const float HandStripTop = -348f;
     private const float HandStripBottom = -264f;
+    private const float OverlayTop = -130f;
+    private const float OverlayBottom = -46f;
+    private const float ReplaceCountTop = -328f;
+    private const float ReplaceCountBottom = -244f;
     private const float HandStripHalfWidth = 150f;
 
-    // The End Turn button root is 220x90 with the multiplayer vote row already at
-    // y -15..15 and the long-press bar at y -11..-5; this band clears both. The x
-    // range copies the vote row, whose center matches the button's.
+    // The End Turn button root is 220x90; this band hugs its top edge (the
+    // multiplayer vote row at y -15..15 only exists in co-op, and drawing over it
+    // was accepted in exchange for proximity). The extension is the ReplaceEndTurn
+    // variant: flush on the button's top edge, full button width.
     private const float EndTurnStripLeft = -16f;
     private const float EndTurnStripRight = 233f;
-    private const float EndTurnStripTop = -64f;
-    private const float EndTurnStripBottom = -24f;
+    private const float EndTurnStripTop = -46f;
+    private const float EndTurnStripBottom = -6f;
+    private const float ExtensionTop = -60f;
+    private const float ExtensionBottom = 0f;
 
     // While a card is held for play, the targeting arrow (GlobalUi, z of its source
     // control + 1) would draw over the strip. This absolute z outranks it, and is
@@ -43,22 +56,18 @@ internal sealed class CombatOverlayView : IDisposable
     // screens during normal hover.
     private const int InPlayZ = 50;
 
-    // The trigger banner sits centered at 20% down the screen ("80% of the way up").
-    private const float BannerAnchorY = 0.2f;
-    private const float BannerHalfHeight = 42f;
+    // The top-center panel sits at 20% down the screen ("80% of the way up").
+    private const float TopPanelAnchorY = 0.2f;
+    private const float TopPanelHalfHeight = 60f;
 
     private readonly NCombatUi _ui;
     private readonly List<RelicModel> _subscribedRelics = [];
+    private readonly Dictionary<NHandCardHolder, HBoxContainer> _handStrips = [];
+    private readonly Dictionary<NHandCardHolder, Label> _hiddenIndexLabels = [];
+    private readonly OptionsPanel _options = new();
     private HBoxContainer? _endTurnStrip;
-    private HBoxContainer? _handStrip;
-    private HBoxContainer? _triggerBanner;
-
-    /// <summary>The holder the hand strip rides: the focused card, or the one in play.</summary>
-    private NHandCardHolder? _stripHolder;
-
-    /// <summary>True while the strip rides a card held for play: counts are projected.</summary>
-    private bool _projected;
-
+    private HBoxContainer? _endTurnExtension;
+    private HBoxContainer? _topPanel;
     private Player? _player;
 
     public CombatOverlayView(NCombatUi ui) => _ui = ui;
@@ -66,28 +75,37 @@ internal sealed class CombatOverlayView : IDisposable
     public void Attach()
     {
         _endTurnStrip = BadgeStrip.CreateContainer("MicroAssistantEndTurnStrip");
-        _endTurnStrip.OffsetLeft = EndTurnStripLeft;
-        _endTurnStrip.OffsetRight = EndTurnStripRight;
-        _endTurnStrip.OffsetTop = EndTurnStripTop;
-        _endTurnStrip.OffsetBottom = EndTurnStripBottom;
         // As a child of the button it inherits the show/hide tweens, including the
         // slide out on enemy turns. The hover animation moves only the button's
         // Visuals child, so the strip does not jitter with it.
         _ui.EndTurnButton.AddChild(_endTurnStrip);
 
+        _endTurnExtension = BadgeStrip.CreateContainer("MicroAssistantEndTurnExtension");
+        _endTurnExtension.OffsetLeft = 0f;
+        _endTurnExtension.OffsetRight = 220f;
+        _endTurnExtension.OffsetTop = ExtensionTop;
+        _endTurnExtension.OffsetBottom = ExtensionBottom;
+        _ui.EndTurnButton.AddChild(_endTurnExtension);
+
         // Full-width so its centered content needs no measuring; only visible while
-        // a play in progress will set something off, which is also why its absolute
-        // z (over the targeting arrow) is safe to leave on permanently.
-        _triggerBanner = BadgeStrip.CreateTriggerBanner("MicroAssistantTriggerBanner");
-        _triggerBanner.AnchorLeft = 0f;
-        _triggerBanner.AnchorRight = 1f;
-        _triggerBanner.AnchorTop = BannerAnchorY;
-        _triggerBanner.AnchorBottom = BannerAnchorY;
-        _triggerBanner.OffsetTop = -BannerHalfHeight;
-        _triggerBanner.OffsetBottom = BannerHalfHeight;
-        _triggerBanner.ZAsRelative = false;
-        _triggerBanner.ZIndex = InPlayZ;
-        _ui.AddChild(_triggerBanner);
+        // a card is focused or in play, which is also why its absolute z (over the
+        // targeting arrow) is safe to leave on permanently.
+        _topPanel = BadgeStrip.CreateTriggerBanner("MicroAssistantTopPanel");
+        _topPanel.AnchorLeft = 0f;
+        _topPanel.AnchorRight = 1f;
+        _topPanel.AnchorTop = TopPanelAnchorY;
+        _topPanel.AnchorBottom = TopPanelAnchorY;
+        _topPanel.OffsetTop = -TopPanelHalfHeight;
+        _topPanel.OffsetBottom = TopPanelHalfHeight;
+        _topPanel.ZAsRelative = false;
+        _topPanel.ZIndex = InPlayZ;
+        _ui.AddChild(_topPanel);
+
+        Guard.Run("Attaching the view options panel", () =>
+        {
+            if (NRun.Instance != null)
+                _options.Attach(NRun.Instance.GlobalUi);
+        });
 
         CombatManager.Instance.CombatBegan += OnCombatBegan;
         CombatManager.Instance.CombatEnded += OnCombatEnded;
@@ -98,6 +116,7 @@ internal sealed class CombatOverlayView : IDisposable
         // once-per-frame signal covers power changes, history ticks, and anything
         // else the specific subscriptions above miss.
         CombatManager.Instance.StateTracker.CombatStateChanged += OnCombatStateChanged;
+        ViewOptions.Changed += OnOptionsChanged;
 
         // The combat usually begins after the UI readies, but bind now in case this
         // view arrives mid-combat.
@@ -113,12 +132,21 @@ internal sealed class CombatOverlayView : IDisposable
         CombatManager.Instance.TurnEnded -= OnTurnChanged;
         RunManager.Instance.HoveredModelTracker.HoverChanged -= OnHoverChanged;
         CombatManager.Instance.StateTracker.CombatStateChanged -= OnCombatStateChanged;
+        ViewOptions.Changed -= OnOptionsChanged;
         UnbindPlayer();
-        FreeStrip(ref _handStrip);
+        RestoreIndexLabels();
+        foreach (var strip in _handStrips.Values)
+            if (GodotObject.IsInstanceValid(strip))
+                strip.QueueFree();
+        _handStrips.Clear();
         FreeStrip(ref _endTurnStrip);
-        FreeStrip(ref _triggerBanner);
-        _stripHolder = null;
+        FreeStrip(ref _endTurnExtension);
+        FreeStrip(ref _topPanel);
+        _options.Dispose();
     }
+
+    /// <summary>Resync now; for patches that fire on transitions no event covers.</summary>
+    public void SyncHandStripNow() => SyncHandStrips();
 
     private void OnCombatBegan(CombatState state) =>
         Guard.Run("Binding the overlay to the new combat", () => BindPlayer(state));
@@ -128,7 +156,7 @@ internal sealed class CombatOverlayView : IDisposable
         {
             UnbindPlayer();
             RefreshEndTurn();
-            SyncHandStrip();
+            SyncHandStrips();
         });
 
     private void OnTurnChanged(CombatState _) =>
@@ -138,7 +166,7 @@ internal sealed class CombatOverlayView : IDisposable
         Guard.Run("Following the focused hand card", () =>
         {
             Diag.Once("hover", () => "Hover event received.");
-            SyncHandStrip();
+            SyncHandStrips();
         });
 
     private void OnCombatStateChanged(CombatState _) =>
@@ -146,15 +174,23 @@ internal sealed class CombatOverlayView : IDisposable
         {
             Diag.Once("statechange", () => "Combat state change received.");
             RefreshEndTurn();
-            SyncHandStrip();
+            SyncHandStrips();
         });
 
-    /// <summary>A tracked relic's counter or status moved; both strips may care.</summary>
+    private void OnOptionsChanged() =>
+        Guard.Run("Applying changed view options", () =>
+        {
+            RestoreIndexLabels();
+            RefreshEndTurn();
+            SyncHandStrips();
+        });
+
+    /// <summary>A tracked relic's counter or status moved; every surface may care.</summary>
     private void OnRelicChanged() =>
         Guard.Run("Refreshing badges on a relic change", () =>
         {
             RefreshEndTurn();
-            RefreshHandBadges();
+            SyncHandStrips();
         });
 
     private void OnRelicListChanged(RelicModel _) =>
@@ -162,7 +198,7 @@ internal sealed class CombatOverlayView : IDisposable
         {
             ResubscribeRelics();
             RefreshEndTurn();
-            RefreshHandBadges();
+            SyncHandStrips();
         });
 
     private void BindPlayer(ICombatState? state)
@@ -216,97 +252,180 @@ internal sealed class CombatOverlayView : IDisposable
 
     private void RefreshEndTurn()
     {
-        if (_endTurnStrip == null || !GodotObject.IsInstanceValid(_endTurnStrip))
-            return;
         var badges = _player != null && CombatManager.Instance.IsInProgress
             ? CountingTracker.ForEndTurn(_player)
             : [];
         Diag.Once("endturn", () =>
             $"End Turn strip refreshed: {badges.Count} badge(s), " +
             $"player {(_player == null ? "unbound" : "bound")}.");
-        BadgeStrip.SetBadges(_endTurnStrip, badges);
+        if (_endTurnStrip != null && GodotObject.IsInstanceValid(_endTurnStrip))
+        {
+            _endTurnStrip.OffsetLeft = EndTurnStripLeft;
+            _endTurnStrip.OffsetRight = EndTurnStripRight;
+            _endTurnStrip.OffsetTop = EndTurnStripTop;
+            _endTurnStrip.OffsetBottom = EndTurnStripBottom;
+            BadgeStrip.SetBadges(
+                _endTurnStrip, ViewOptions.ReplaceEndTurn ? [] : badges);
+        }
+        if (_endTurnExtension != null && GodotObject.IsInstanceValid(_endTurnExtension))
+            BadgeStrip.SetBadges(
+                _endTurnExtension, ViewOptions.ReplaceEndTurn ? badges : [], backed: true);
     }
-
-    /// <summary>Resync now; for patches that fire on transitions no event covers.</summary>
-    public void SyncHandStripNow() => SyncHandStrip();
 
     /// <summary>
-    /// Move the hand strip to whichever holder deserves it now: the card play in
-    /// progress — so the information survives dragging the card out, and switches
-    /// to projected counts — or the focused card in hand. In-play wins because at
-    /// the moment a play starts the old holder may still briefly hold focus.
+    /// Reconcile the per-holder strips with what deserves one now: every active
+    /// holder under Always On, else just the focused card — plus, so the
+    /// information survives dragging a card out to play it, the holder of the card
+    /// play in progress. In-play wins focus disputes because at the moment a play
+    /// starts the old holder may still briefly hold focus.
     /// </summary>
-    private void SyncHandStrip()
+    private void SyncHandStrips()
     {
-        NHandCardHolder? holder = null;
-        _projected = false;
-        if (CombatManager.Instance.IsInProgress)
+        var wanted = new List<NHandCardHolder>();
+        NHandCardHolder? inPlay = null;
+        if (CombatManager.Instance.IsInProgress && NPlayerHand.Instance is { } hand)
         {
-            var inPlay = InPlayHolder();
-            _projected = inPlay != null;
-            holder = inPlay ?? NPlayerHand.Instance?.FocusedHolder;
-        }
-        if (holder == _stripHolder)
-        {
-            // Same holder, but hover may have just become a play (or the reverse);
-            // the refresh re-reads _projected either way.
-            RefreshHandBadges();
-            return;
-        }
-
-        FreeStrip(ref _handStrip);
-        _stripHolder = holder;
-        if (holder == null)
-        {
-            UpdateTriggerBanner([]);
-            return;
+            inPlay = InPlayHolder();
+            if (ViewOptions.AlwaysOn)
+                foreach (var holder in hand.ActiveHolders)
+                    wanted.Add(holder);
+            var active = inPlay ?? hand.FocusedHolder;
+            if (active != null && !wanted.Contains(active))
+                wanted.Add(active);
+            // Big & Bold moves the active card's display to the top panel; without
+            // Always On its above-card strip disappears entirely.
+            if (ViewOptions.BigAndBold && !ViewOptions.AlwaysOn && active != null)
+                wanted.Remove(active);
         }
 
-        // Parented to the holder, the strip rides the card's pop-up motion and is
-        // freed with it. The focused holder is unrotated at scale one, so these
-        // holder-local offsets are exact screen shape.
-        _handStrip = BadgeStrip.CreateContainer("MicroAssistantHandStrip");
-        _handStrip.OffsetLeft = -HandStripHalfWidth;
-        _handStrip.OffsetRight = HandStripHalfWidth;
-        _handStrip.OffsetTop = HandStripTop;
-        _handStrip.OffsetBottom = HandStripBottom;
-        holder.AddChild(_handStrip);
-        RefreshHandBadges();
+        foreach (var (holder, strip) in _handStrips.Where(pair =>
+                     !GodotObject.IsInstanceValid(pair.Key) ||
+                     !wanted.Contains(pair.Key)).ToList())
+        {
+            RestoreIndexLabel(holder);
+            if (GodotObject.IsInstanceValid(strip))
+                strip.QueueFree();
+            _handStrips.Remove(holder);
+        }
+
+        foreach (var holder in wanted)
+            RefreshHolderStrip(holder, projected: holder == inPlay);
+
+        UpdateTopPanel(inPlay);
     }
 
-    private void RefreshHandBadges()
+    private void RefreshHolderStrip(NHandCardHolder holder, bool projected)
     {
-        if (_handStrip == null || !GodotObject.IsInstanceValid(_handStrip))
-        {
-            UpdateTriggerBanner([]);
+        if (!GodotObject.IsInstanceValid(holder))
             return;
+        if (!_handStrips.TryGetValue(holder, out var strip) ||
+            !GodotObject.IsInstanceValid(strip))
+        {
+            // Parented to the holder, a strip rides the card's motion (fan, pop-up,
+            // drag) for free and is freed with it.
+            strip = BadgeStrip.CreateContainer("MicroAssistantHandStrip");
+            strip.OffsetLeft = -HandStripHalfWidth;
+            strip.OffsetRight = HandStripHalfWidth;
+            holder.AddChild(strip);
+            _handStrips[holder] = strip;
         }
-        var card = _stripHolder != null && GodotObject.IsInstanceValid(_stripHolder)
-            ? _stripHolder.CardModel
-            : null;
-        var badges = card != null && CombatManager.Instance.IsInProgress
-            ? CountingTracker.ForCardPlay(card.Owner, card, _projected)
+
+        var (top, bottom) = ViewOptions.CardOverlay ? (OverlayTop, OverlayBottom)
+            : ViewOptions.ReplaceCardCount ? (ReplaceCountTop, ReplaceCountBottom)
+            : (HandStripTop, HandStripBottom);
+        strip.OffsetTop = top;
+        strip.OffsetBottom = bottom;
+        strip.ZAsRelative = !projected;
+        strip.ZIndex = projected ? InPlayZ : 0;
+
+        var card = holder.CardModel;
+        var badges = card != null
+            ? CountingTracker.ForCardPlay(card.Owner, card, projected)
             : [];
         Diag.Once("hand", () =>
             $"Hand strip refreshed: {badges.Count} badge(s) for " +
             $"{card?.Id.Entry ?? "no card"}.");
-        // Above the targeting arrow only while a card is in play; relative z while
-        // merely hovering, so overlays keep drawing over the strip.
-        _handStrip.ZAsRelative = !_projected;
-        _handStrip.ZIndex = _projected ? InPlayZ : 0;
-        BadgeStrip.SetBadges(_handStrip, badges, backed: true);
-        UpdateTriggerBanner(badges);
+        BadgeStrip.SetBadges(
+            strip, badges, backed: !ViewOptions.CardOverlay, prefix: CountPrefix(holder));
+        SyncIndexLabel(holder, hide: ViewOptions.ReplaceCardCount && badges.Count > 0);
     }
 
-    /// <summary>The banner speaks only while a play in progress will set something off.</summary>
-    private void UpdateTriggerBanner(IReadOnlyList<SourceBadge> badges)
+    /// <summary>
+    /// The top-center panel: under Big &amp; Bold it carries the active card's full
+    /// badge row at double size whenever a card is focused or in play; otherwise it
+    /// shows the icons of what a play in progress will set off.
+    /// </summary>
+    private void UpdateTopPanel(NHandCardHolder? inPlay)
     {
-        if (_triggerBanner == null || !GodotObject.IsInstanceValid(_triggerBanner))
+        if (_topPanel == null || !GodotObject.IsInstanceValid(_topPanel))
             return;
-        var triggering = _projected
-            ? badges.Where(badge => badge.WillTrigger).ToList()
+        var active = inPlay ?? (CombatManager.Instance.IsInProgress
+            ? NPlayerHand.Instance?.FocusedHolder
+            : null);
+        var card = active != null && GodotObject.IsInstanceValid(active)
+            ? active.CardModel
+            : null;
+
+        if (!ViewOptions.BigAndBold)
+        {
+            var triggering = card != null && inPlay != null
+                ? CountingTracker.ForCardPlay(card.Owner, card, projected: true)
+                    .Where(badge => badge.WillTrigger).ToList()
+                : [];
+            BadgeStrip.SetTriggerIcons(_topPanel, triggering);
+            return;
+        }
+
+        var badges = card != null
+            ? CountingTracker.ForCardPlay(card.Owner, card, projected: inPlay != null)
             : [];
-        BadgeStrip.SetTriggerIcons(_triggerBanner, triggering);
+        BadgeStrip.SetBadges(_topPanel, badges, backed: true, scale: 2f,
+            prefix: active != null && ViewOptions.ReplaceCardCount ? CountPrefix(active) : null);
+        _topPanel.Visible = badges.Count > 0;
+    }
+
+    /// <summary>The native hand-count digit, absorbed as a "N." strip prefix.</summary>
+    private string? CountPrefix(NHandCardHolder holder)
+    {
+        if (!ViewOptions.ReplaceCardCount || !GodotObject.IsInstanceValid(holder))
+            return null;
+        var label = holder.GetNodeOrNull<Label>("%HandIndex");
+        return label != null && label.Text.Length > 0 ? $"{label.Text}." : null;
+    }
+
+    private void SyncIndexLabel(NHandCardHolder holder, bool hide)
+    {
+        if (!GodotObject.IsInstanceValid(holder))
+            return;
+        if (hide)
+        {
+            if (_hiddenIndexLabels.ContainsKey(holder))
+                return;
+            var label = holder.GetNodeOrNull<Label>("%HandIndex");
+            if (label == null)
+                return;
+            label.Visible = false;
+            _hiddenIndexLabels[holder] = label;
+        }
+        else
+        {
+            RestoreIndexLabel(holder);
+        }
+    }
+
+    private void RestoreIndexLabel(NHandCardHolder holder)
+    {
+        if (_hiddenIndexLabels.Remove(holder, out var label) &&
+            GodotObject.IsInstanceValid(label))
+            label.Visible = true;
+    }
+
+    private void RestoreIndexLabels()
+    {
+        foreach (var label in _hiddenIndexLabels.Values)
+            if (GodotObject.IsInstanceValid(label))
+                label.Visible = true;
+        _hiddenIndexLabels.Clear();
     }
 
     /// <summary>

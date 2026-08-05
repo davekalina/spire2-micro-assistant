@@ -62,6 +62,15 @@ The layering that must not regress silently:
 
 ### Surfaces to audit
 
+Five experimental view switches (session-only, toggled live from the upper-right
+panel under the version/seed block, `ViewOptions` + `OptionsPanel`): **Big & Bold**
+(focused card's badges doubled at the top-center panel instead of above the card),
+**Always On** (every hand card carries its strip), **Card Overlay** (strip on the
+card art, unbacked, at Hypergeo's proven on-art band), **Replace Card Count** (the
+native hand digit hides and the strip absorbs it as a "N." prefix, dropping onto
+the digit's spot), **Replace End Turn Button** (End Turn badges render as a flush
+backed extension on the button's top edge instead of floating above it).
+
 Any directional change must be applied across all of these:
 
 - the badge strip above the focused hand card (mouse hover and controller focus;
@@ -82,7 +91,11 @@ Any directional change must be applied across all of these:
 - badge visuals shared by both strips (`BadgeStrip`: icon, count label, X mark);
 - combat lifecycle edges: combat start and end, relic gained or lost mid-combat,
   power applied or removed mid-combat, relic melted, instanced powers appearing
-  more than once, card played while another card is focused.
+  more than once, card played while another card is focused;
+- every view switch in every combination (the options compose: placement comes
+  from Card Overlay > Replace Card Count > default; Big & Bold moves the focused
+  display; Always On multiplies strips), plus flipping a switch mid-combat and
+  restoring the hidden hand digits when Replace Card Count turns off.
 
 ## Mod UI: match the game
 

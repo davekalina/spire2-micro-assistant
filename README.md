@@ -18,6 +18,10 @@ powers react to what you are about to do.
   shows a native tooltip spelling it out — "Will draw 3 extra cards next turn." or
   "Will NOT".
 
+An upper-right panel on the combat screen (under the version/seed block) offers
+live experimental view switches: Big & Bold, Always On, Card Overlay, Replace
+Card Count, and Replace End Turn Button.
+
 Counts are read from the same values the game's own UI prints, so the two never
 disagree. Nothing about the game's behavior changes.
 
