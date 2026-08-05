@@ -2,12 +2,14 @@ using Godot;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
+using MegaCrit.Sts2.addons.mega_text;
 
 namespace MicroAssistant.MicroAssistantCode;
 
@@ -29,26 +31,30 @@ internal sealed class CombatOverlayView : IDisposable
     // y -211..211, the native %HandIndex hotkey digit occupies y -288..-224):
     // - Default: bottom edge fixed just above the digit, backing grows upward.
     // - CardOverlay: centered on Hypergeo's proven on-art band (center y -88).
-    // - ReplaceCardCount: dropped onto the digit's own spot, which the strip
-    //   absorbs as a "N." prefix while the digit itself is hidden.
-    private const float HandStripTop = -348f;
+    // - ReplaceCardCount: dropped onto the digit's own spot — the band's bottom
+    //   matches the digit's so nothing peeks out — which the strip absorbs as a
+    //   "N. " prefix while the digit itself is hidden.
+    // Bands scale with the badge scale (Big & Bold): the fixed edge stays put and
+    // the band grows away from the card.
+    private const float PanelHeight = 84f;
     private const float HandStripBottom = -264f;
-    private const float OverlayTop = -130f;
-    private const float OverlayBottom = -46f;
-    private const float ReplaceCountTop = -328f;
-    private const float ReplaceCountBottom = -244f;
+    private const float OverlayCenter = -88f;
+    private const float ReplaceCountBottom = -224f;
     private const float HandStripHalfWidth = 150f;
 
     // The End Turn button root is 220x90; this band hugs its top edge (the
     // multiplayer vote row at y -15..15 only exists in co-op, and drawing over it
-    // was accepted in exchange for proximity). The extension is the ReplaceEndTurn
-    // variant: flush on the button's top edge, full button width.
+    // was accepted in exchange for proximity). The replacement face is the
+    // ReplaceEndTurn variant: the native Visuals hide entirely and a taller backed
+    // face spans the badge row plus the End Turn text over the same click region.
     private const float EndTurnStripLeft = -16f;
     private const float EndTurnStripRight = 233f;
     private const float EndTurnStripTop = -46f;
     private const float EndTurnStripBottom = -6f;
-    private const float ExtensionTop = -60f;
-    private const float ExtensionBottom = 0f;
+    private const float FaceLeft = -10f;
+    private const float FaceRight = 230f;
+    private const float FaceTop = -64f;
+    private const float FaceBottom = 94f;
 
     // While a card is held for play, the targeting arrow (GlobalUi, z of its source
     // control + 1) would draw over the strip. This absolute z outranks it, and is
@@ -80,11 +86,11 @@ internal sealed class CombatOverlayView : IDisposable
         // Visuals child, so the strip does not jitter with it.
         _ui.EndTurnButton.AddChild(_endTurnStrip);
 
-        _endTurnExtension = BadgeStrip.CreateContainer("MicroAssistantEndTurnExtension");
-        _endTurnExtension.OffsetLeft = 0f;
-        _endTurnExtension.OffsetRight = 220f;
-        _endTurnExtension.OffsetTop = ExtensionTop;
-        _endTurnExtension.OffsetBottom = ExtensionBottom;
+        _endTurnExtension = BadgeStrip.CreateContainer("MicroAssistantEndTurnFace");
+        _endTurnExtension.OffsetLeft = FaceLeft;
+        _endTurnExtension.OffsetRight = FaceRight;
+        _endTurnExtension.OffsetTop = FaceTop;
+        _endTurnExtension.OffsetBottom = FaceBottom;
         _ui.EndTurnButton.AddChild(_endTurnExtension);
 
         // Full-width so its centered content needs no measuring; only visible while
@@ -139,6 +145,10 @@ internal sealed class CombatOverlayView : IDisposable
             if (GodotObject.IsInstanceValid(strip))
                 strip.QueueFree();
         _handStrips.Clear();
+        // The native button face must come back even if the flag is still on.
+        var visuals = _ui.EndTurnButton?.GetNodeOrNull<Control>("Visuals");
+        if (visuals != null && GodotObject.IsInstanceValid(visuals))
+            visuals.Visible = true;
         FreeStrip(ref _endTurnStrip);
         FreeStrip(ref _endTurnExtension);
         FreeStrip(ref _topPanel);
@@ -267,9 +277,61 @@ internal sealed class CombatOverlayView : IDisposable
             BadgeStrip.SetBadges(
                 _endTurnStrip, ViewOptions.ReplaceEndTurn ? [] : badges);
         }
-        if (_endTurnExtension != null && GodotObject.IsInstanceValid(_endTurnExtension))
-            BadgeStrip.SetBadges(
-                _endTurnExtension, ViewOptions.ReplaceEndTurn ? badges : [], backed: true);
+        RefreshEndTurnFace(badges);
+    }
+
+    /// <summary>
+    /// The Replace End Turn Button face: the native Visuals (art, label, glow) hide
+    /// entirely and a taller backed face carries the badge row over the End Turn
+    /// text — read live from the hidden native label, which the game keeps
+    /// updating. Everything in the face ignores the mouse except badge tooltip
+    /// cells, which all sit above the click region, so pressing is untouched.
+    /// </summary>
+    private void RefreshEndTurnFace(List<SourceBadge> badges)
+    {
+        if (_endTurnExtension == null || !GodotObject.IsInstanceValid(_endTurnExtension))
+            return;
+        var visuals = _ui.EndTurnButton.GetNodeOrNull<Control>("Visuals");
+        if (visuals != null)
+            visuals.Visible = !ViewOptions.ReplaceEndTurn;
+
+        foreach (var child in _endTurnExtension.GetChildren())
+        {
+            _endTurnExtension.RemoveChild(child);
+            child.QueueFree();
+        }
+        if (!ViewOptions.ReplaceEndTurn)
+            return;
+
+        var column = new VBoxContainer
+        {
+            Alignment = BoxContainer.AlignmentMode.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        column.AddThemeConstantOverride("separation", 2);
+        if (badges.Count > 0)
+        {
+            var row = BadgeStrip.CreateContainer("Badges");
+            BadgeStrip.SetBadges(row, badges);
+            column.AddChild(row);
+        }
+        var native = _ui.EndTurnButton.GetNodeOrNull<Label>("Visuals/Label");
+        var label = new MegaLabel
+        {
+            Text = native?.Text ?? "End Turn",
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            AutoSizeEnabled = false,
+        };
+        label.AddThemeFontOverride("font",
+            ResourceLoader.Load<Font>("res://themes/kreon_bold_glyph_space_one.tres"));
+        label.AddThemeFontSizeOverride("font_size", 30);
+        label.AddThemeColorOverride("font_color", StsColors.cream);
+        label.AddThemeColorOverride("font_outline_color", new Color(0.12f, 0.10208f, 0.0816f));
+        label.AddThemeConstantOverride("outline_size", 10);
+        column.AddChild(label);
+        _endTurnExtension.AddChild(BadgeStrip.BackedPanel(column));
     }
 
     /// <summary>
@@ -292,9 +354,9 @@ internal sealed class CombatOverlayView : IDisposable
             var active = inPlay ?? hand.FocusedHolder;
             if (active != null && !wanted.Contains(active))
                 wanted.Add(active);
-            // Big & Bold moves the active card's display to the top panel; without
+            // Show Up Top moves the active card's display to the top panel; without
             // Always On its above-card strip disappears entirely.
-            if (ViewOptions.BigAndBold && !ViewOptions.AlwaysOn && active != null)
+            if (ViewOptions.ShowUpTop && !ViewOptions.AlwaysOn && active != null)
                 wanted.Remove(active);
         }
 
@@ -330,9 +392,17 @@ internal sealed class CombatOverlayView : IDisposable
             _handStrips[holder] = strip;
         }
 
-        var (top, bottom) = ViewOptions.CardOverlay ? (OverlayTop, OverlayBottom)
-            : ViewOptions.ReplaceCardCount ? (ReplaceCountTop, ReplaceCountBottom)
-            : (HandStripTop, HandStripBottom);
+        // Big & Bold doubles only the active card's display, and only while that
+        // display lives on the card (Show Up Top sizes the top panel instead).
+        var active = projected ||
+            holder == NPlayerHand.Instance?.FocusedHolder;
+        var scale = active && ViewOptions.BigAndBold && !ViewOptions.ShowUpTop ? 2f : 1f;
+        var height = PanelHeight * scale;
+        var (top, bottom) = ViewOptions.CardOverlay
+            ? (OverlayCenter - height / 2f, OverlayCenter + height / 2f)
+            : ViewOptions.ReplaceCardCount
+                ? (ReplaceCountBottom - height, ReplaceCountBottom)
+                : (HandStripBottom - height, HandStripBottom);
         strip.OffsetTop = top;
         strip.OffsetBottom = bottom;
         strip.ZAsRelative = !projected;
@@ -346,14 +416,15 @@ internal sealed class CombatOverlayView : IDisposable
             $"Hand strip refreshed: {badges.Count} badge(s) for " +
             $"{card?.Id.Entry ?? "no card"}.");
         BadgeStrip.SetBadges(
-            strip, badges, backed: !ViewOptions.CardOverlay, prefix: CountPrefix(holder));
+            strip, badges, backed: true, scale: scale, prefix: CountPrefix(holder));
         SyncIndexLabel(holder, hide: ViewOptions.ReplaceCardCount && badges.Count > 0);
     }
 
     /// <summary>
-    /// The top-center panel: under Big &amp; Bold it carries the active card's full
-    /// badge row at double size whenever a card is focused or in play; otherwise it
-    /// shows the icons of what a play in progress will set off.
+    /// The top-center panel: under Show Up Top it carries the active card's full
+    /// badge row (sized by Big &amp; Bold, never showing the card number — that
+    /// context is worthless up there) whenever a card is focused or in play;
+    /// otherwise it shows the icons of what a play in progress will set off.
     /// </summary>
     private void UpdateTopPanel(NHandCardHolder? inPlay)
     {
@@ -366,7 +437,7 @@ internal sealed class CombatOverlayView : IDisposable
             ? active.CardModel
             : null;
 
-        if (!ViewOptions.BigAndBold)
+        if (!ViewOptions.ShowUpTop)
         {
             var triggering = card != null && inPlay != null
                 ? CountingTracker.ForCardPlay(card.Owner, card, projected: true)
@@ -379,18 +450,33 @@ internal sealed class CombatOverlayView : IDisposable
         var badges = card != null
             ? CountingTracker.ForCardPlay(card.Owner, card, projected: inPlay != null)
             : [];
-        BadgeStrip.SetBadges(_topPanel, badges, backed: true, scale: 2f,
-            prefix: active != null && ViewOptions.ReplaceCardCount ? CountPrefix(active) : null);
+        BadgeStrip.SetBadges(
+            _topPanel, badges, backed: true, scale: ViewOptions.BigAndBold ? 2f : 1f);
         _topPanel.Visible = badges.Count > 0;
     }
 
-    /// <summary>The native hand-count digit, absorbed as a "N." strip prefix.</summary>
+    /// <summary>The native hand-count digit, absorbed as a "N. " strip prefix.</summary>
     private string? CountPrefix(NHandCardHolder holder)
     {
         if (!ViewOptions.ReplaceCardCount || !GodotObject.IsInstanceValid(holder))
             return null;
         var label = holder.GetNodeOrNull<Label>("%HandIndex");
-        return label != null && label.Text.Length > 0 ? $"{label.Text}." : null;
+        return label != null && label.Text.Length > 0 ? $"{label.Text}. " : null;
+    }
+
+    /// <summary>
+    /// The game's SetIndexLabel just re-showed a digit this view absorbed; hide it
+    /// again. Called from the patch, so it must stay cheap.
+    /// </summary>
+    public void ReassertIndexHidden(NHandCardHolder holder)
+    {
+        if (!ViewOptions.ReplaceCardCount)
+            return;
+        if (_hiddenIndexLabels.TryGetValue(holder, out var label) &&
+            GodotObject.IsInstanceValid(label))
+            label.Visible = false;
+        else if (_handStrips.ContainsKey(holder))
+            SyncIndexLabel(holder, hide: true);
     }
 
     private void SyncIndexLabel(NHandCardHolder holder, bool hide)

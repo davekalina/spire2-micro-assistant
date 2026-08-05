@@ -7,9 +7,13 @@ namespace MicroAssistant.MicroAssistantCode;
 /// </summary>
 internal static class ViewOptions
 {
-    /// <summary>The focused card's badges render doubled at the top-center panel
-    /// instead of the subtle strip above the card.</summary>
+    /// <summary>The focused card's badge display renders at double size, wherever
+    /// it is placed.</summary>
     public static bool BigAndBold;
+
+    /// <summary>The focused card's badge display moves to the top-center panel
+    /// (sized by BigAndBold, never showing the card number).</summary>
+    public static bool ShowUpTop;
 
     /// <summary>Every card in hand carries its badge strip, not just the focused one.</summary>
     public static bool AlwaysOn;

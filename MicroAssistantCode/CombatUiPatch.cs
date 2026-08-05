@@ -1,4 +1,5 @@
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 
 namespace MicroAssistant.MicroAssistantCode;
@@ -18,6 +19,13 @@ internal static class CombatUiPatch
     {
         foreach (var view in Views.Values)
             view.SyncHandStripNow();
+    }
+
+    /// <summary>Re-assert a hidden hand digit after the game re-shows it.</summary>
+    internal static void ReassertIndexHidden(NHandCardHolder holder)
+    {
+        foreach (var view in Views.Values)
+            view.ReassertIndexHidden(holder);
     }
 
     [HarmonyPostfix]
@@ -61,4 +69,19 @@ internal static class CardPlayStartPatch
             Diag.Once("cardplay", () => "Card play start observed.");
             CombatUiPatch.SyncViews();
         });
+}
+
+/// <summary>
+/// The game's SetIndexLabel re-shows the hand digit from the player's settings on
+/// every layout pass, silently undoing the Replace Card Count hide; this postfix
+/// puts the hide back the moment that happens.
+/// </summary>
+[HarmonyPatch(typeof(NHandCardHolder))]
+internal static class HandIndexPatch
+{
+    [HarmonyPostfix]
+    [HarmonyPatch(nameof(NHandCardHolder.SetIndexLabel))]
+    private static void AfterSetIndexLabel(NHandCardHolder __instance) =>
+        Guard.Run("Re-hiding an absorbed hand digit", () =>
+            CombatUiPatch.ReassertIndexHidden(__instance));
 }

@@ -72,6 +72,7 @@ internal sealed class OptionsPanel : IDisposable
         var rows = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         rows.AddThemeConstantOverride("separation", 2);
         AddToggle(rows, "Big & Bold", () => ViewOptions.BigAndBold, v => ViewOptions.BigAndBold = v);
+        AddToggle(rows, "Show Up Top", () => ViewOptions.ShowUpTop, v => ViewOptions.ShowUpTop = v);
         AddToggle(rows, "Always On", () => ViewOptions.AlwaysOn, v => ViewOptions.AlwaysOn = v);
         AddToggle(rows, "Card Overlay",
             () => ViewOptions.CardOverlay, v => ViewOptions.CardOverlay = v);
@@ -89,7 +90,7 @@ internal sealed class OptionsPanel : IDisposable
         _dropdown.OffsetLeft = -352f;
         _dropdown.OffsetRight = -12f;
         _dropdown.OffsetTop = 134f;
-        _dropdown.OffsetBottom = 330f;
+        _dropdown.OffsetBottom = 360f;
         _root.AddChild(_dropdown);
 
         parent.AddChild(_root);
