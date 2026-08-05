@@ -23,9 +23,12 @@ internal sealed class OptionsPanel : IDisposable
 
     private Control? _root;
     private Control? _dropdown;
+    private MegaLabel? _statusLine;
+    private Func<string?>? _status;
 
-    public void Attach(Control parent)
+    public void Attach(Control parent, Func<string?> status)
     {
+        _status = status;
         _root = new Control
         {
             Name = "MicroAssistantOptions",
@@ -63,6 +66,9 @@ internal sealed class OptionsPanel : IDisposable
                 _root == null || !GodotObject.IsInstanceValid(_root))
                 return;
             _dropdown.Visible = !_dropdown.Visible;
+            if (_dropdown.Visible && _statusLine != null &&
+                GodotObject.IsInstanceValid(_statusLine))
+                _statusLine.Text = _status?.Invoke() ?? "";
             // Last sibling wins Godot's input picking; whatever overlay sat on this
             // spot loses the contest once we are in front.
             _root.MoveToFront();
@@ -71,6 +77,24 @@ internal sealed class OptionsPanel : IDisposable
 
         var rows = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
         rows.AddThemeConstantOverride("separation", 2);
+
+        // Whether the quiet is correct: how many of the run's relics and powers the
+        // mod actually understands right now. Refreshed each time the menu opens.
+        _statusLine = new MegaLabel
+        {
+            Text = "",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            AutoSizeEnabled = false,
+            Modulate = new Color(1f, 1f, 1f, 0.75f),
+        };
+        _statusLine.AddThemeFontOverride("font", ResourceLoader.Load<Font>(FontPath));
+        _statusLine.AddThemeFontSizeOverride("font_size", 15);
+        _statusLine.AddThemeColorOverride("font_color", StsColors.gold);
+        _statusLine.AddThemeColorOverride("font_outline_color", new Color(0.12f, 0.10208f, 0.0816f));
+        _statusLine.AddThemeConstantOverride("outline_size", 6);
+        rows.AddChild(_statusLine);
+
         AddToggle(rows, "Big & Bold", () => ViewOptions.BigAndBold, v => ViewOptions.BigAndBold = v);
         AddToggle(rows, "Show Up Top", () => ViewOptions.ShowUpTop, v => ViewOptions.ShowUpTop = v);
         AddToggle(rows, "Always On", () => ViewOptions.AlwaysOn, v => ViewOptions.AlwaysOn = v);
@@ -102,6 +126,7 @@ internal sealed class OptionsPanel : IDisposable
             _root.QueueFree();
         _root = null;
         _dropdown = null;
+        _statusLine = null;
     }
 
     private static void AddToggle(Container into, string name, Func<bool> get, Action<bool> set)

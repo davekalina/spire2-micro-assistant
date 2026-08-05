@@ -25,8 +25,9 @@ Card Count, and Replace End Turn Button.
 Counts are read from the same values the game's own UI prints, so the two never
 disagree. Nothing about the game's behavior changes.
 
-Covers ~27 relics and 9 powers; the full list is in `AGENTS.md`. Adding another
-source is one registry entry in `MicroAssistantCode/CountingTracker.cs`.
+Covers 28 relics and 9 powers; the full list is in `AGENTS.md`. Adding another
+source is one registry entry in `MicroAssistantCode/CountingTracker.cs`. The gear
+menu reports how many of the current run's relics and powers are being tracked.
 
 ## Build
 

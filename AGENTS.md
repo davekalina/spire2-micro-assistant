@@ -35,7 +35,9 @@ Pocketwatch, Pendulum, Pen Nib, Nunchaku, Kunai, Shuriken, Ornamental Fan,
 Kusarigama, Letter Opener, Tuning Fork, Iron Club, Brilliant Scarf, Velvet Choker,
 Art of War, Ripple Basin, Pael's Eye, Rainbow Ring, Happy Flower, Fake Happy
 Flower, Pollinous Core, Stone Calendar, Music Box, Vambrace, Permafrost, Pael's
-Legion, Orichalcum, Fake Orichalcum; powers — Echo Form, Void Form, Nostalgia,
+Legion, Orichalcum, Fake Orichalcum, Joss Paper (Exhaust cards advance it;
+Ethereal cards carry the badge as a reminder without advancing or projecting);
+powers — Echo Form, Void Form, Nostalgia,
 Unmovable, Lethality, Phantom Blades, Juggling, Pale Blue Dot, Panache.
 Deliberately excluded: Unsettling Lamp (a card's "applies a debuff to an enemy" is
 only decidable at play time), locks and end-turn reversals (the game communicates
@@ -62,8 +64,10 @@ The layering that must not regress silently:
 
 ### Surfaces to audit
 
-Five experimental view switches (session-only, toggled live from the upper-right
-panel under the version/seed block, `ViewOptions` + `OptionsPanel`): **Big & Bold**
+The gear menu's first row is a status line — "Tracking X of N relics, Y of M
+powers" — refreshed each open, so a badge-less run is diagnosable at a glance.
+Six experimental view switches (session-only, behind the settings-gear icon left
+of the version text, `ViewOptions` + `OptionsPanel`): **Big & Bold**
 (focused card's badges doubled at the top-center panel instead of above the card),
 **Always On** (every hand card carries its strip), **Card Overlay** (strip on the
 card art, unbacked, at Hypergeo's proven on-art band), **Replace Card Count** (the

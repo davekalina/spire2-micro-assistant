@@ -113,7 +113,7 @@ internal sealed class CombatOverlayView : IDisposable
         Guard.Run("Attaching the view options panel", () =>
         {
             if (NRun.Instance != null)
-                _options.Attach(NRun.Instance.GlobalUi);
+                _options.Attach(NRun.Instance.GlobalUi, StatusLine);
         });
 
         CombatManager.Instance.CombatBegan += OnCombatBegan;
@@ -456,6 +456,20 @@ internal sealed class CombatOverlayView : IDisposable
         BadgeStrip.SetBadges(
             _topPanel, badges, backed: true, scale: ViewOptions.BigAndBold ? 2f : 1f);
         _topPanel.Visible = badges.Count > 0;
+    }
+
+    /// <summary>
+    /// The gear menu's status line: whether the current quiet is correct. Counting
+    /// what the tracker understands out of what the run actually holds.
+    /// </summary>
+    private string? StatusLine()
+    {
+        if (_player == null || !CombatManager.Instance.IsInProgress)
+            return "Not bound to a combat";
+        var trackedRelics = CountingTracker.TrackedRelics(_player).Count();
+        var trackedPowers = CountingTracker.TrackedPowers(_player).Count();
+        return $"Tracking {trackedRelics} of {_player.Relics.Count} relics, " +
+            $"{trackedPowers} of {_player.Creature.Powers.Count} powers";
     }
 
     /// <summary>The native hand-count digit, absorbed as a "N. " strip prefix.</summary>
