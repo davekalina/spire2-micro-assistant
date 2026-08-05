@@ -309,6 +309,39 @@ internal static class CountingTracker
 
         [typeof(Orichalcum)] = OrichalcumEntry(),
         [typeof(FakeOrichalcum)] = OrichalcumEntry(),
+
+        // ---- Contextual reminders ---------------------------------------------
+
+        // Cloak Clasp blocks per card in hand when the turn ends; its End Turn
+        // badge carries the amount it is about to grant.
+        [typeof(CloakClasp)] = new(
+            PlayEffect: (_, _) => CardPlayEffect.None,
+            EndTurn: _ => EndTurnState.Active,
+            CountText: relic => CloakClaspBlock(relic).ToString(),
+            Primed: _ => false,
+            EndTurnTip: (relic, _) => new BadgeTip(
+                Title(relic),
+                $"Will gain {CloakClaspBlock(relic)} Block when this turn ends.")),
+
+        // Paper Phrog deepens Vulnerable; attacks carry its icon as a reminder
+        // while any enemy is currently Vulnerable.
+        [typeof(PaperPhrog)] = new(
+            PlayEffect: (relic, card) => CountingRules.TickerPlay(
+                card.Type == CardType.Attack && AnyEnemyVulnerable(relic)),
+            EndTurn: _ => EndTurnState.Hidden,
+            CountText: _ => null,
+            Primed: _ => false,
+            EndTurnTip: (_, _) => null),
+
+        // Intimidating Helmet grants Block whenever a card is played with 2+
+        // energy actually spent; cards currently costing that much carry its icon.
+        [typeof(IntimidatingHelmet)] = new(
+            PlayEffect: (relic, card) => CountingRules.TickerPlay(
+                card.EnergyCost.GetAmountToSpend() >= relic.DynamicVars.Energy.IntValue),
+            EndTurn: _ => EndTurnState.Hidden,
+            CountText: _ => null,
+            Primed: _ => false,
+            EndTurnTip: (_, _) => null),
     };
 
     private static readonly Dictionary<Type, PowerSemantics> Powers = new()
@@ -585,6 +618,13 @@ internal static class CountingTracker
         if (CombatQueries.PlaysOfTypeThisTurn(player, CardType.Power) > 0) filled++;
         return filled;
     }
+
+    private static int CloakClaspBlock(RelicModel relic) =>
+        (relic.Owner.PlayerCombatState?.Hand.Cards.Count ?? 0) * IntVar(relic, "Block");
+
+    private static bool AnyEnemyVulnerable(RelicModel relic) =>
+        relic.Owner.Creature.CombatState?.HittableEnemies
+            .Any(enemy => enemy.HasPower<VulnerablePower>()) ?? false;
 
     private static int IntVar(RelicModel relic, string key) =>
         relic.DynamicVars[key].IntValue;

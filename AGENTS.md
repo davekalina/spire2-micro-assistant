@@ -36,7 +36,10 @@ Kusarigama, Letter Opener, Tuning Fork, Iron Club, Brilliant Scarf, Velvet Choke
 Art of War, Ripple Basin, Pael's Eye, Rainbow Ring, Happy Flower, Fake Happy
 Flower, Pollinous Core, Stone Calendar, Music Box, Vambrace, Permafrost, Pael's
 Legion, Orichalcum, Fake Orichalcum, Joss Paper (Exhaust cards advance it;
-Ethereal cards carry the badge as a reminder without advancing or projecting);
+Ethereal cards carry the badge as a reminder without advancing or projecting),
+and three contextual reminders — Cloak Clasp (End Turn badge carrying the block
+it is about to grant), Paper Phrog (attacks while any enemy is Vulnerable),
+Intimidating Helmet (cards currently costing 2+ energy);
 powers — Echo Form, Void Form, Nostalgia,
 Unmovable, Lethality, Phantom Blades, Juggling, Pale Blue Dot, Panache.
 Deliberately excluded: Unsettling Lamp (a card's "applies a debuff to an enemy" is
