@@ -35,8 +35,11 @@ internal sealed class CombatOverlayView : IDisposable
     //   matches the digit's so nothing peeks out — which the strip absorbs as a
     //   "N. " prefix while the digit itself is hidden.
     // Bands scale with the badge scale (Big & Bold): the fixed edge stays put and
-    // the band grows away from the card.
-    private const float PanelHeight = 84f;
+    // the band grows away from the card. Only the icon row scales — the tooltip
+    // backing's content insets are fixed — so the band is row + insets, not a
+    // flat multiple (which left the panel one-third empty at double size).
+    private const float BadgeRowHeight = 40f;
+    private const float BackingInsets = 44f;
     private const float HandStripBottom = -264f;
     private const float OverlayCenter = -88f;
     private const float ReplaceCountBottom = -224f;
@@ -397,7 +400,7 @@ internal sealed class CombatOverlayView : IDisposable
         var active = projected ||
             holder == NPlayerHand.Instance?.FocusedHolder;
         var scale = active && ViewOptions.BigAndBold && !ViewOptions.ShowUpTop ? 2f : 1f;
-        var height = PanelHeight * scale;
+        var height = BadgeRowHeight * scale + BackingInsets;
         var (top, bottom) = ViewOptions.CardOverlay
             ? (OverlayCenter - height / 2f, OverlayCenter + height / 2f)
             : ViewOptions.ReplaceCardCount
