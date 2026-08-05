@@ -5,37 +5,93 @@ using MegaCrit.Sts2.addons.mega_text;
 namespace MicroAssistant.MicroAssistantCode;
 
 /// <summary>
-/// The upper-right toggle list for the experimental view switches, sitting under
-/// the game's version/seed block. Plain clickable text rows in the game's font —
-/// deliberately austere; these are dev switches being auditioned, not shipped UI.
+/// The experimental view switches, folded behind the game's own settings gear so
+/// they take no screen space until asked for. The gear sits just left of the
+/// version/seed block (whose box spans right-edge offsets -170..-11 from y 93);
+/// clicking it drops a tooltip-backed list of toggle rows beneath. Opening also
+/// moves the panel to the front of GlobalUi — Godot routes mouse picking by tree
+/// order, not z, and other overlays were eating the bare rows' clicks.
 /// </summary>
 internal sealed class OptionsPanel : IDisposable
 {
+    private const string GearTexturePath =
+        "res://images/atlases/ui_atlas.sprites/top_bar/top_bar_settings.tres";
     private const string FontPath = "res://themes/kreon_bold_glyph_space_one.tres";
     private const int FontSize = 18;
+    private static readonly Color GearIdle = new(1f, 1f, 1f, 0.6f);
+    private static readonly Color GearHover = Colors.White;
 
-    private VBoxContainer? _root;
+    private Control? _root;
+    private Control? _dropdown;
 
     public void Attach(Control parent)
     {
-        _root = new VBoxContainer
+        _root = new Control
         {
             Name = "MicroAssistantOptions",
+            AnchorRight = 1f,
+            AnchorBottom = 1f,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            // Drawn above other overlays; input priority is handled by MoveToFront.
+            ZAsRelative = false,
+            ZIndex = 60,
+        };
+
+        var gear = new TextureRect
+        {
+            Texture = ResourceLoader.Load<Texture2D>(GearTexturePath),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            MouseFilter = Control.MouseFilterEnum.Stop,
+            Modulate = GearIdle,
             AnchorLeft = 1f,
             AnchorRight = 1f,
-            OffsetLeft = -280f,
-            OffsetRight = -12f,
-            OffsetTop = 150f,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
+            OffsetLeft = -216f,
+            OffsetRight = -180f,
+            OffsetTop = 92f,
+            OffsetBottom = 128f,
         };
-        _root.AddThemeConstantOverride("separation", 2);
-        AddToggle("Big & Bold", () => ViewOptions.BigAndBold, v => ViewOptions.BigAndBold = v);
-        AddToggle("Always On", () => ViewOptions.AlwaysOn, v => ViewOptions.AlwaysOn = v);
-        AddToggle("Card Overlay", () => ViewOptions.CardOverlay, v => ViewOptions.CardOverlay = v);
-        AddToggle("Replace Card Count",
+        gear.MouseEntered += () => Guard.Run("Highlighting the options gear", () =>
+            gear.Modulate = GearHover);
+        gear.MouseExited += () => Guard.Run("Unhighlighting the options gear", () =>
+            gear.Modulate = GearIdle);
+        gear.GuiInput += @event => Guard.Run("Toggling the options dropdown", () =>
+        {
+            if (@event is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left })
+                return;
+            if (_dropdown == null || !GodotObject.IsInstanceValid(_dropdown) ||
+                _root == null || !GodotObject.IsInstanceValid(_root))
+                return;
+            _dropdown.Visible = !_dropdown.Visible;
+            // Last sibling wins Godot's input picking; whatever overlay sat on this
+            // spot loses the contest once we are in front.
+            _root.MoveToFront();
+        });
+        _root.AddChild(gear);
+
+        var rows = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        rows.AddThemeConstantOverride("separation", 2);
+        AddToggle(rows, "Big & Bold", () => ViewOptions.BigAndBold, v => ViewOptions.BigAndBold = v);
+        AddToggle(rows, "Always On", () => ViewOptions.AlwaysOn, v => ViewOptions.AlwaysOn = v);
+        AddToggle(rows, "Card Overlay",
+            () => ViewOptions.CardOverlay, v => ViewOptions.CardOverlay = v);
+        AddToggle(rows, "Replace Card Count",
             () => ViewOptions.ReplaceCardCount, v => ViewOptions.ReplaceCardCount = v);
-        AddToggle("Replace End Turn Button",
+        AddToggle(rows, "Replace End Turn Button",
             () => ViewOptions.ReplaceEndTurn, v => ViewOptions.ReplaceEndTurn = v);
+
+        _dropdown = BadgeStrip.BackedPanel(rows);
+        _dropdown.Visible = false;
+        // Block click-through to whatever sits behind the open list.
+        _dropdown.MouseFilter = Control.MouseFilterEnum.Stop;
+        _dropdown.AnchorLeft = 1f;
+        _dropdown.AnchorRight = 1f;
+        _dropdown.OffsetLeft = -352f;
+        _dropdown.OffsetRight = -12f;
+        _dropdown.OffsetTop = 134f;
+        _dropdown.OffsetBottom = 330f;
+        _root.AddChild(_dropdown);
+
         parent.AddChild(_root);
     }
 
@@ -44,14 +100,15 @@ internal sealed class OptionsPanel : IDisposable
         if (_root != null && GodotObject.IsInstanceValid(_root))
             _root.QueueFree();
         _root = null;
+        _dropdown = null;
     }
 
-    private void AddToggle(string name, Func<bool> get, Action<bool> set)
+    private static void AddToggle(Container into, string name, Func<bool> get, Action<bool> set)
     {
         var row = new MegaLabel
         {
             Text = Render(name, get()),
-            HorizontalAlignment = HorizontalAlignment.Right,
+            HorizontalAlignment = HorizontalAlignment.Left,
             MouseFilter = Control.MouseFilterEnum.Stop,
             AutoSizeEnabled = false,
         };
@@ -68,7 +125,7 @@ internal sealed class OptionsPanel : IDisposable
             row.Text = Render(name, get());
             ViewOptions.Notify();
         });
-        _root!.AddChild(row);
+        into.AddChild(row);
     }
 
     private static string Render(string name, bool on) => $"[{(on ? "X" : "  ")}] {name}";

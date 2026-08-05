@@ -99,7 +99,7 @@ internal static class BadgeStrip
     /// The native tooltip's backing sandwich around some content: shadow and
     /// nine-patch filling a MarginContainer, content inset by the art's borders.
     /// </summary>
-    private static Control BackedPanel(Control content)
+    public static Control BackedPanel(Control content)
     {
         var panel = new MarginContainer
         {
