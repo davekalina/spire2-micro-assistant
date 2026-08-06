@@ -2,7 +2,7 @@
   "title": "Micro Assistant",
   "description": "Shows which counting relics and powers each card play affects - on the hovered card, and above the End Turn button.",
   "visibility": "unlisted",
-  "changeNote": "v0.8.0: Joss Paper (Exhaust cards advance it, Ethereal cards remind), Cloak Clasp (End Turn badge with the block it will grant), Paper Phrog (attacks while an enemy is Vulnerable), Intimidating Helmet (2+ cost cards). The gear menu now reports how many of the run relics and powers are tracked.",
+  "changeNote": "v0.11.0: badge scale slider (0.5-3.0) replaces Big and Bold; End Turn badges fade with the button between turns; Replace End Turn face is wider, wraps badges 4 per row, keeps the long-press bar visible, highlights on hover, and no longer swallows presses; turn tickers drop their redundant number; Ripple Basin/Orichalcum badge the Block they will grant; native slash roundel replaces the X; wide badge rows center; Hide Negated Payoffs switch; Replace Card Count defaults on.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
