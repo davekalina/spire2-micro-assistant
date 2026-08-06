@@ -70,9 +70,10 @@ The layering that must not regress silently:
 
 The gear menu's first row is a status line — "Tracking X of N relics, Y of M
 powers" — refreshed each open, so a badge-less run is diagnosable at a glance.
-Six experimental view switches (session-only except where noted, behind the
+Seven experimental view switches (session-only except where noted, behind the
 settings-gear icon left of the version text, `ViewOptions` + `OptionsPanel`;
-Replace Card Count defaults ON — it won its audition): **Big & Bold**
+Replace Card Count defaults ON — it won its audition; **Hide Negated Payoffs**
+drops the slashed will-NOT End Turn badges instead of showing them): **Big & Bold**
 (focused card's badges doubled at the top-center panel instead of above the card),
 **Always On** (every hand card carries its strip), **Card Overlay** (strip on the
 card art, unbacked, at Hypergeo's proven on-art band), **Replace Card Count** (the

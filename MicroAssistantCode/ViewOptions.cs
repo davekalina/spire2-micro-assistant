@@ -30,6 +30,11 @@ internal static class ViewOptions
     /// button instead of floating above it.</summary>
     public static bool ReplaceEndTurn;
 
+    /// <summary>Hide End Turn badges whose payoff is already lost (the slashed
+    /// will-NOT verdicts: Art of War after an attack, Orichalcum with block up,
+    /// Pocketwatch past its limit) instead of showing them negated.</summary>
+    public static bool HideNegatedPayoffs;
+
     public static event Action? Changed;
 
     public static void Notify() => Changed?.Invoke();

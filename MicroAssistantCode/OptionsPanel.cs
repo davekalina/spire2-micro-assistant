@@ -104,6 +104,8 @@ internal sealed class OptionsPanel : IDisposable
             () => ViewOptions.ReplaceCardCount, v => ViewOptions.ReplaceCardCount = v);
         AddToggle(rows, "Replace End Turn Button",
             () => ViewOptions.ReplaceEndTurn, v => ViewOptions.ReplaceEndTurn = v);
+        AddToggle(rows, "Hide Negated Payoffs",
+            () => ViewOptions.HideNegatedPayoffs, v => ViewOptions.HideNegatedPayoffs = v);
 
         _dropdown = BadgeStrip.BackedPanel(rows);
         _dropdown.Visible = false;
@@ -114,7 +116,7 @@ internal sealed class OptionsPanel : IDisposable
         _dropdown.OffsetLeft = -352f;
         _dropdown.OffsetRight = -12f;
         _dropdown.OffsetTop = 134f;
-        _dropdown.OffsetBottom = 360f;
+        _dropdown.OffsetBottom = 388f;
         _root.AddChild(_dropdown);
 
         parent.AddChild(_root);

@@ -272,6 +272,9 @@ internal sealed class CombatOverlayView : IDisposable
         var badges = _player != null && CombatManager.Instance.IsInProgress
             ? CountingTracker.ForEndTurn(_player)
             : [];
+        // "Hide Negated Payoffs": a lost payoff disappears instead of being slashed.
+        if (ViewOptions.HideNegatedPayoffs)
+            badges = badges.Where(badge => !badge.Broken).ToList();
         Diag.Once("endturn", () =>
             $"End Turn strip refreshed: {badges.Count} badge(s), " +
             $"player {(_player == null ? "unbound" : "bound")}.");
