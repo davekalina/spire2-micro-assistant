@@ -2,7 +2,7 @@
   "title": "Micro Assistant",
   "description": "Shows which counting relics and powers each card play affects - on the hovered card, and above the End Turn button.",
   "visibility": "unlisted",
-  "changeNote": "v0.6.3: live view switches behind a gear icon next to the version text - Big and Bold, Show Up Top, Always On, Card Overlay, Replace Card Count, and Replace End Turn Button. Session-only while auditioning.",
+  "changeNote": "v0.8.0: Joss Paper (Exhaust cards advance it, Ethereal cards remind), Cloak Clasp (End Turn badge with the block it will grant), Paper Phrog (attacks while an enemy is Vulnerable), Intimidating Helmet (2+ cost cards). The gear menu now reports how many of the run relics and powers are tracked.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
