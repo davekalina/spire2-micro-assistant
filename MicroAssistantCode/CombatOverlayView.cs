@@ -70,9 +70,10 @@ internal sealed class CombatOverlayView : IDisposable
     // screens during normal hover.
     private const int InPlayZ = 50;
 
-    // The top-center panel sits at 20% down the screen ("80% of the way up").
+    // The top-center panel sits at 20% down the screen ("80% of the way up"); its
+    // band height is computed from the badge scale on every refresh, like the
+    // hand strips, so the backing hugs the icons at either size.
     private const float TopPanelAnchorY = 0.2f;
-    private const float TopPanelHalfHeight = 60f;
 
     private readonly NCombatUi _ui;
     private readonly List<RelicModel> _subscribedRelics = [];
@@ -109,8 +110,6 @@ internal sealed class CombatOverlayView : IDisposable
         _topPanel.AnchorRight = 1f;
         _topPanel.AnchorTop = TopPanelAnchorY;
         _topPanel.AnchorBottom = TopPanelAnchorY;
-        _topPanel.OffsetTop = -TopPanelHalfHeight;
-        _topPanel.OffsetBottom = TopPanelHalfHeight;
         _topPanel.ZAsRelative = false;
         _topPanel.ZIndex = InPlayZ;
         _ui.AddChild(_topPanel);
@@ -447,6 +446,7 @@ internal sealed class CombatOverlayView : IDisposable
 
         if (!ViewOptions.ShowUpTop)
         {
+            SizeTopPanel(1f);
             var triggering = card != null && inPlay != null
                 ? CountingTracker.ForCardPlay(card.Owner, card, projected: true)
                     .Where(badge => badge.WillTrigger).ToList()
@@ -455,12 +455,20 @@ internal sealed class CombatOverlayView : IDisposable
             return;
         }
 
+        var scale = ViewOptions.BigAndBold ? 2f : 1f;
+        SizeTopPanel(scale);
         var badges = card != null
             ? CountingTracker.ForCardPlay(card.Owner, card, projected: inPlay != null)
             : [];
-        BadgeStrip.SetBadges(
-            _topPanel, badges, backed: true, scale: ViewOptions.BigAndBold ? 2f : 1f);
+        BadgeStrip.SetBadges(_topPanel, badges, backed: true, scale: scale);
         _topPanel.Visible = badges.Count > 0;
+    }
+
+    private void SizeTopPanel(float scale)
+    {
+        var half = (BadgeRowHeight * scale + BackingInsets) / 2f;
+        _topPanel!.OffsetTop = -half;
+        _topPanel.OffsetBottom = half;
     }
 
     /// <summary>
