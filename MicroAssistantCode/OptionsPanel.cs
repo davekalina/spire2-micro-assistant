@@ -95,7 +95,7 @@ internal sealed class OptionsPanel : IDisposable
         _statusLine.AddThemeConstantOverride("outline_size", 6);
         rows.AddChild(_statusLine);
 
-        AddToggle(rows, "Big & Bold", () => ViewOptions.BigAndBold, v => ViewOptions.BigAndBold = v);
+        AddScaleSlider(rows);
         AddToggle(rows, "Show Up Top", () => ViewOptions.ShowUpTop, v => ViewOptions.ShowUpTop = v);
         AddToggle(rows, "Always On", () => ViewOptions.AlwaysOn, v => ViewOptions.AlwaysOn = v);
         AddToggle(rows, "Card Overlay",
@@ -130,6 +130,55 @@ internal sealed class OptionsPanel : IDisposable
         _dropdown = null;
         _statusLine = null;
     }
+
+    /// <summary>
+    /// The badge-scale slider that replaced the Big &amp; Bold toggle: 0.5..3.0 in
+    /// 0.05 steps (the slider's Step does the rounding), applied to the focused
+    /// card's display wherever it is placed.
+    /// </summary>
+    private static void AddScaleSlider(Container into)
+    {
+        var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        row.AddThemeConstantOverride("separation", 8);
+
+        var label = new MegaLabel
+        {
+            Text = ScaleText(),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            AutoSizeEnabled = false,
+            CustomMinimumSize = new Vector2(104f, 0f),
+        };
+        label.AddThemeFontOverride("font", ResourceLoader.Load<Font>(FontPath));
+        label.AddThemeFontSizeOverride("font_size", FontSize);
+        label.AddThemeColorOverride("font_color", StsColors.cream);
+        label.AddThemeColorOverride("font_outline_color", new Color(0.12f, 0.10208f, 0.0816f));
+        label.AddThemeConstantOverride("outline_size", 8);
+        row.AddChild(label);
+
+        var slider = new HSlider
+        {
+            MinValue = 0.5,
+            MaxValue = 3.0,
+            Step = 0.05,
+            Value = ViewOptions.Scale,
+            CustomMinimumSize = new Vector2(130f, 22f),
+            SizeFlagsVertical = Control.SizeFlags.ShrinkCenter,
+            MouseFilter = Control.MouseFilterEnum.Stop,
+        };
+        slider.ValueChanged += value => Guard.Run("Adjusting the badge scale", () =>
+        {
+            // Step already quantizes to 0.05; the rounding here just kills float noise.
+            ViewOptions.Scale = (float)(Math.Round(value * 20.0) / 20.0);
+            label.Text = ScaleText();
+            ViewOptions.Notify();
+        });
+        row.AddChild(slider);
+        into.AddChild(row);
+    }
+
+    private static string ScaleText() => $"Scale: {ViewOptions.Scale:0.00}";
 
     private static void AddToggle(Container into, string name, Func<bool> get, Action<bool> set)
     {

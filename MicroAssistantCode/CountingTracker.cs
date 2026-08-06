@@ -121,7 +121,7 @@ internal static class CountingTracker
                 CountingRules.AvoidancePlay(card.Type == CardType.Attack),
             EndTurn: relic => CountingRules.AvoidanceEndTurn(
                 !CombatQueries.AnyAttackPlayedThisTurn(relic.Owner)),
-            CountText: _ => null,
+            CountText: relic => IntVar(relic, "Block").ToString(),
             Primed: _ => false,
             EndTurnTip: (relic, state) => new BadgeTip(
                 Title(relic),
@@ -253,7 +253,7 @@ internal static class CountingTracker
             PlayEffect: (_, _) => CountingRules.PendulumPlay(),
             EndTurn: relic =>
                 CountingRules.PendulumEndTurn(((Pendulum)relic).TurnsSeen, IntVar(relic, "Turns")),
-            CountText: relic => ((Pendulum)relic).TurnsSeen.ToString(),
+            CountText: _ => null,
             Primed: relic =>
                 CountingRules.IsPrimed(((Pendulum)relic).TurnsSeen, IntVar(relic, "Turns")),
             EndTurnTip: (relic, _) => new BadgeTip(
@@ -264,7 +264,7 @@ internal static class CountingTracker
             PlayEffect: (_, _) => CardPlayEffect.None,
             EndTurn: relic =>
                 CountingRules.PendulumEndTurn(((HappyFlower)relic).TurnsSeen, IntVar(relic, "Turns")),
-            CountText: relic => ((HappyFlower)relic).TurnsSeen.ToString(),
+            CountText: _ => null,
             Primed: relic =>
                 CountingRules.IsPrimed(((HappyFlower)relic).TurnsSeen, IntVar(relic, "Turns")),
             EndTurnTip: (relic, _) => new BadgeTip(
@@ -275,7 +275,7 @@ internal static class CountingTracker
             PlayEffect: (_, _) => CardPlayEffect.None,
             EndTurn: relic => CountingRules.PendulumEndTurn(
                 ((FakeHappyFlower)relic).TurnsSeen, IntVar(relic, "Turns")),
-            CountText: relic => ((FakeHappyFlower)relic).TurnsSeen.ToString(),
+            CountText: _ => null,
             Primed: relic => CountingRules.IsPrimed(
                 ((FakeHappyFlower)relic).TurnsSeen, IntVar(relic, "Turns")),
             EndTurnTip: (relic, _) => new BadgeTip(
@@ -287,7 +287,7 @@ internal static class CountingTracker
             PlayEffect: (_, _) => CardPlayEffect.None,
             EndTurn: relic => CountingRules.PollinousEndTurn(
                 ((PollinousCore)relic).TurnsSeen, IntVar(relic, "Turns")),
-            CountText: relic => ((PollinousCore)relic).TurnsSeen.ToString(),
+            CountText: _ => null,
             Primed: relic => ((PollinousCore)relic).TurnsSeen >= IntVar(relic, "Turns") - 1,
             EndTurnTip: (relic, _) => new BadgeTip(
                 Title(relic),
@@ -583,7 +583,7 @@ internal static class CountingTracker
     private static RelicSemantics OrichalcumEntry() => new(
         PlayEffect: (_, card) => CountingRules.OrichalcumPlay(card.GainsBlock),
         EndTurn: relic => CountingRules.OrichalcumEndTurn(relic.Owner.Creature.Block),
-        CountText: _ => null,
+        CountText: relic => IntVar(relic, "Block").ToString(),
         Primed: _ => false,
         EndTurnTip: (relic, state) => new BadgeTip(
             Title(relic),

@@ -7,9 +7,12 @@ namespace MicroAssistant.MicroAssistantCode;
 /// </summary>
 internal static class ViewOptions
 {
-    /// <summary>The focused card's badge display renders at double size, wherever
-    /// it is placed.</summary>
-    public static bool BigAndBold;
+    /// <summary>
+    /// Size multiplier for the focused card's badge display, wherever it is placed
+    /// (the slider that replaced the Big &amp; Bold toggle; that mode was 2.0).
+    /// Slider range 0.5..3.0 in 0.05 steps.
+    /// </summary>
+    public static float Scale = 1f;
 
     /// <summary>The focused card's badge display moves to the top-center panel
     /// (sized by BigAndBold, never showing the card number).</summary>

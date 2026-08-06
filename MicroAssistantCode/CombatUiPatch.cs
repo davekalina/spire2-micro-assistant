@@ -28,6 +28,13 @@ internal static class CombatUiPatch
             view.ReassertIndexHidden(holder);
     }
 
+    /// <summary>Fade the End Turn badges with the button's own slide animation.</summary>
+    internal static void SetEndTurnBadgesVisible(bool visible)
+    {
+        foreach (var view in Views.Values)
+            view.SetEndTurnBadgesVisible(visible);
+    }
+
     [HarmonyPostfix]
     [HarmonyPatch(nameof(NCombatUi._Ready))]
     private static void AfterReady(NCombatUi __instance) =>
@@ -69,6 +76,28 @@ internal static class CardPlayStartPatch
             Diag.Once("cardplay", () => "Card play start observed.");
             CombatUiPatch.SyncViews();
         });
+}
+
+/// <summary>
+/// The End Turn button tweens itself off-screen between turns; our badge bands
+/// rise above its top edge and would peek over the screen bottom while it is
+/// parked. These postfixes fade the badges out and in with the button's own
+/// animations.
+/// </summary>
+[HarmonyPatch(typeof(NEndTurnButton))]
+internal static class EndTurnAnimPatch
+{
+    [HarmonyPostfix]
+    [HarmonyPatch("AnimOut")]
+    private static void AfterAnimOut() =>
+        Guard.Run("Fading End Turn badges out", () =>
+            CombatUiPatch.SetEndTurnBadgesVisible(false));
+
+    [HarmonyPostfix]
+    [HarmonyPatch("AnimIn")]
+    private static void AfterAnimIn() =>
+        Guard.Run("Fading End Turn badges in", () =>
+            CombatUiPatch.SetEndTurnBadgesVisible(true));
 }
 
 /// <summary>

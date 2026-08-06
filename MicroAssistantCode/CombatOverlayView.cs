@@ -59,10 +59,15 @@ internal sealed class CombatOverlayView : IDisposable
     private const float EndTurnStripRight = 358f;
     private const float EndTurnStripTop = -46f;
     private const float EndTurnStripBottom = -6f;
-    private const float FaceLeft = -10f;
-    private const float FaceRight = 230f;
-    private const float FaceTop = -64f;
-    private const float FaceBottom = 94f;
+    // Wider than the button (same center, 110) and as short as its content: badge
+    // rows of at most four wrap, every interactive cell stays above the button's
+    // click region (y < 0), and only the mouse-ignoring label dips onto the art.
+    private const float FaceLeft = -70f;
+    private const float FaceRight = 290f;
+    private const float FaceLabelDip = 46f;
+    private const int FaceBadgesPerRow = 4;
+    private const float FaceRowHeight = 46f;
+    private const float FaceLabelHeight = 36f;
 
     // While a card is held for play, the targeting arrow (GlobalUi, z of its source
     // control + 1) would draw over the strip. This absolute z outranks it, and is
@@ -83,6 +88,7 @@ internal sealed class CombatOverlayView : IDisposable
     private HBoxContainer? _endTurnStrip;
     private HBoxContainer? _endTurnExtension;
     private HBoxContainer? _topPanel;
+    private MegaLabel? _faceLabel;
     private Player? _player;
 
     public CombatOverlayView(NCombatUi ui) => _ui = ui;
@@ -98,9 +104,11 @@ internal sealed class CombatOverlayView : IDisposable
         _endTurnExtension = BadgeStrip.CreateContainer("MicroAssistantEndTurnFace");
         _endTurnExtension.OffsetLeft = FaceLeft;
         _endTurnExtension.OffsetRight = FaceRight;
-        _endTurnExtension.OffsetTop = FaceTop;
-        _endTurnExtension.OffsetBottom = FaceBottom;
         _ui.EndTurnButton.AddChild(_endTurnExtension);
+        // Mirror the native label highlight: the button still takes the hover (all
+        // face parts over its rect ignore the mouse), we just repaint our text.
+        _ui.EndTurnButton.MouseEntered += OnEndTurnHoverStart;
+        _ui.EndTurnButton.MouseExited += OnEndTurnHoverEnd;
 
         // Full-width so its centered content needs no measuring; only visible while
         // a card is focused or in play, which is also why its absolute z (over the
@@ -152,10 +160,15 @@ internal sealed class CombatOverlayView : IDisposable
             if (GodotObject.IsInstanceValid(strip))
                 strip.QueueFree();
         _handStrips.Clear();
-        // The native button face must come back even if the flag is still on.
-        var visuals = _ui.EndTurnButton?.GetNodeOrNull<Control>("Visuals");
-        if (visuals != null && GodotObject.IsInstanceValid(visuals))
-            visuals.Visible = true;
+        if (_ui.EndTurnButton != null && GodotObject.IsInstanceValid(_ui.EndTurnButton))
+        {
+            _ui.EndTurnButton.MouseEntered -= OnEndTurnHoverStart;
+            _ui.EndTurnButton.MouseExited -= OnEndTurnHoverEnd;
+            // The native button face must come back even if the flag is still on.
+            var visuals = _ui.EndTurnButton.GetNodeOrNull<Control>("Visuals");
+            if (visuals != null && GodotObject.IsInstanceValid(visuals))
+                visuals.Visible = true;
+        }
         FreeStrip(ref _endTurnStrip);
         FreeStrip(ref _endTurnExtension);
         FreeStrip(ref _topPanel);
@@ -292,10 +305,12 @@ internal sealed class CombatOverlayView : IDisposable
 
     /// <summary>
     /// The Replace End Turn Button face: the native Visuals (art, label, glow) hide
-    /// entirely and a taller backed face carries the badge row over the End Turn
-    /// text — read live from the hidden native label, which the game keeps
-    /// updating. Everything in the face ignores the mouse except badge tooltip
-    /// cells, which all sit above the click region, so pressing is untouched.
+    /// entirely and a backed face carries badge rows — at most four per row,
+    /// wrapping, so a long relic list grows down instead of out into the pile
+    /// buttons — over the End Turn text, read live from the hidden native label.
+    /// The face is sized to its content, every tooltip cell sits above the button's
+    /// click region, everything over the button ignores the mouse, and the native
+    /// long-press bar is pulled in front of the backing so it stays visible.
     /// </summary>
     private void RefreshEndTurnFace(List<SourceBadge> badges)
     {
@@ -310,8 +325,14 @@ internal sealed class CombatOverlayView : IDisposable
             _endTurnExtension.RemoveChild(child);
             child.QueueFree();
         }
+        _faceLabel = null;
         if (!ViewOptions.ReplaceEndTurn)
             return;
+
+        var rowCount = (badges.Count + FaceBadgesPerRow - 1) / FaceBadgesPerRow;
+        _endTurnExtension.OffsetBottom = FaceLabelDip;
+        _endTurnExtension.OffsetTop = FaceLabelDip -
+            (BackingInsets + rowCount * FaceRowHeight + FaceLabelHeight);
 
         var column = new VBoxContainer
         {
@@ -319,14 +340,15 @@ internal sealed class CombatOverlayView : IDisposable
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
         column.AddThemeConstantOverride("separation", 2);
-        if (badges.Count > 0)
+        for (var start = 0; start < badges.Count; start += FaceBadgesPerRow)
         {
             var row = BadgeStrip.CreateContainer("Badges");
-            BadgeStrip.SetBadges(row, badges);
+            BadgeStrip.SetBadges(
+                row, badges.Skip(start).Take(FaceBadgesPerRow).ToList());
             column.AddChild(row);
         }
         var native = _ui.EndTurnButton.GetNodeOrNull<Label>("Visuals/Label");
-        var label = new MegaLabel
+        _faceLabel = new MegaLabel
         {
             Text = native?.Text ?? "End Turn",
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -334,14 +356,49 @@ internal sealed class CombatOverlayView : IDisposable
             MouseFilter = Control.MouseFilterEnum.Ignore,
             AutoSizeEnabled = false,
         };
-        label.AddThemeFontOverride("font",
+        _faceLabel.AddThemeFontOverride("font",
             ResourceLoader.Load<Font>("res://themes/kreon_bold_glyph_space_one.tres"));
-        label.AddThemeFontSizeOverride("font_size", 30);
-        label.AddThemeColorOverride("font_color", StsColors.cream);
-        label.AddThemeColorOverride("font_outline_color", new Color(0.12f, 0.10208f, 0.0816f));
-        label.AddThemeConstantOverride("outline_size", 10);
-        column.AddChild(label);
+        _faceLabel.AddThemeFontSizeOverride("font_size", 28);
+        _faceLabel.AddThemeColorOverride("font_color", StsColors.cream);
+        _faceLabel.AddThemeColorOverride("font_outline_color", new Color(0.12f, 0.10208f, 0.0816f));
+        _faceLabel.AddThemeConstantOverride("outline_size", 10);
+        column.AddChild(_faceLabel);
         _endTurnExtension.AddChild(BadgeStrip.BackedPanel(column));
+        // The native long-press bar is an earlier sibling and would draw under the
+        // backing; keep the gamepad hold feedback on top.
+        _ui.EndTurnButton.GetNodeOrNull<Control>("%Bar")?.MoveToFront();
+    }
+
+    private void OnEndTurnHoverStart() =>
+        Guard.Run("Highlighting the End Turn face", () =>
+        {
+            if (_faceLabel != null && GodotObject.IsInstanceValid(_faceLabel))
+                _faceLabel.Modulate = StsColors.red;
+        });
+
+    private void OnEndTurnHoverEnd() =>
+        Guard.Run("Unhighlighting the End Turn face", () =>
+        {
+            if (_faceLabel != null && GodotObject.IsInstanceValid(_faceLabel))
+                _faceLabel.Modulate = Colors.White;
+        });
+
+    /// <summary>
+    /// The button tweens itself off-screen between turns, but our badge bands rise
+    /// above its top edge and would peek over the screen bottom; fade them with it.
+    /// Driven by postfixes on the button's own AnimOut/AnimIn.
+    /// </summary>
+    public void SetEndTurnBadgesVisible(bool visible)
+    {
+        FadeStrip(_endTurnStrip, visible);
+        FadeStrip(_endTurnExtension, visible);
+    }
+
+    private static void FadeStrip(Control? strip, bool visible)
+    {
+        if (strip == null || !GodotObject.IsInstanceValid(strip))
+            return;
+        strip.CreateTween().TweenProperty(strip, "modulate:a", visible ? 1f : 0f, 0.25f);
     }
 
     /// <summary>
@@ -402,11 +459,11 @@ internal sealed class CombatOverlayView : IDisposable
             _handStrips[holder] = strip;
         }
 
-        // Big & Bold doubles only the active card's display, and only while that
-        // display lives on the card (Show Up Top sizes the top panel instead).
+        // The scale slider sizes only the active card's display, and only while
+        // that display lives on the card (Show Up Top sizes the top panel instead).
         var active = projected ||
             holder == NPlayerHand.Instance?.FocusedHolder;
-        var scale = active && ViewOptions.BigAndBold && !ViewOptions.ShowUpTop ? 2f : 1f;
+        var scale = active && !ViewOptions.ShowUpTop ? ViewOptions.Scale : 1f;
         var height = BadgeRowHeight * scale + BackingInsets;
         var (top, bottom) = ViewOptions.CardOverlay
             ? (OverlayCenter - height / 2f, OverlayCenter + height / 2f)
@@ -458,7 +515,7 @@ internal sealed class CombatOverlayView : IDisposable
             return;
         }
 
-        var scale = ViewOptions.BigAndBold ? 2f : 1f;
+        var scale = ViewOptions.Scale;
         SizeTopPanel(scale);
         var badges = card != null
             ? CountingTracker.ForCardPlay(card.Owner, card, projected: inPlay != null)
