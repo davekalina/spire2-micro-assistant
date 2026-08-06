@@ -70,11 +70,16 @@ The layering that must not regress silently:
 
 The gear menu's first row is a status line — "Tracking X of N relics, Y of M
 powers" — refreshed each open, so a badge-less run is diagnosable at a glance.
-Seven experimental view switches (session-only except where noted, behind the
-settings-gear icon left of the version text, `ViewOptions` + `OptionsPanel`;
-Replace Card Count defaults ON — it won its audition; **Hide Negated Payoffs**
-drops the slashed will-NOT End Turn badges instead of showing them): **Big & Bold**
-(focused card's badges doubled at the top-center panel instead of above the card),
+The experimental view controls (session-only except where noted, behind the
+settings-gear icon left of the version text, `ViewOptions` + `OptionsPanel`):
+a **badge scale slider** (0.5–3.0 in 0.05 steps; replaced the Big & Bold toggle,
+which was scale 2.0) plus six switches — Replace Card Count defaults ON, it won
+its audition; **Hide Negated Payoffs** drops the slashed will-NOT End Turn
+badges instead of showing them. End Turn badges fade with the button's own
+AnimOut/AnimIn so nothing pokes above the screen bottom between turns; the
+Replace End Turn face wraps badges four per row and keeps every tooltip cell
+above the button's click region (a cell over the button would swallow presses): **Scale slider**
+(sizes the focused card's display wherever it is placed),
 **Always On** (every hand card carries its strip), **Card Overlay** (strip on the
 card art, unbacked, at Hypergeo's proven on-art band), **Replace Card Count** (the
 native hand digit hides and the strip absorbs it as a "N." prefix, dropping onto
