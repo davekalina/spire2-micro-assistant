@@ -41,7 +41,8 @@ and three contextual reminders — Cloak Clasp (End Turn badge carrying the bloc
 it is about to grant), Paper Phrog (attacks while any enemy is Vulnerable),
 Intimidating Helmet (cards currently costing 2+ energy);
 powers — Echo Form, Void Form, Nostalgia,
-Unmovable, Lethality, Phantom Blades, Juggling, Pale Blue Dot, Panache.
+Unmovable, Lethality, Phantom Blades, Juggling, Pale Blue Dot, Panache, and
+Plating (End Turn badge carrying the Block about to be granted).
 Deliberately excluded: Unsettling Lamp (a card's "applies a debuff to an enemy" is
 only decidable at play time), locks and end-turn reversals (the game communicates
 them), Make It So / Normality / FTL.
@@ -69,8 +70,9 @@ The layering that must not regress silently:
 
 The gear menu's first row is a status line — "Tracking X of N relics, Y of M
 powers" — refreshed each open, so a badge-less run is diagnosable at a glance.
-Six experimental view switches (session-only, behind the settings-gear icon left
-of the version text, `ViewOptions` + `OptionsPanel`): **Big & Bold**
+Six experimental view switches (session-only except where noted, behind the
+settings-gear icon left of the version text, `ViewOptions` + `OptionsPanel`;
+Replace Card Count defaults ON — it won its audition): **Big & Bold**
 (focused card's badges doubled at the top-center panel instead of above the card),
 **Always On** (every hand card carries its strip), **Card Overlay** (strip on the
 card art, unbacked, at Hypergeo's proven on-art band), **Replace Card Count** (the
@@ -95,7 +97,8 @@ Any directional change must be applied across all of these:
   turn, when the strip rides the button's slide-out tween);
 - the hover tips on End Turn badges (will / will NOT wording, counts read from the
   source's DynamicVars; hand badges must never catch the mouse and get no tips);
-- badge visuals shared by both strips (`BadgeStrip`: icon, count label, X mark);
+- badge visuals shared by both strips (`BadgeStrip`: icon, count label, and the
+  broken mark — the game's own card_unplayable_icon slash roundel, not a glyph);
 - combat lifecycle edges: combat start and end, relic gained or lost mid-combat,
   power applied or removed mid-combat, relic melted, instanced powers appearing
   more than once, card played while another card is focused;

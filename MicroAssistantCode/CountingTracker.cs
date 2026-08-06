@@ -417,6 +417,17 @@ internal static class CountingTracker
             NextCount: (power, _) =>
                 CountingRules.NextDown(power.DisplayAmount).ToString()),
 
+        // Plating grants its stacks as Block when the turn ends, then decays; the
+        // End Turn badge is the reminder, carrying the amount about to be granted.
+        [typeof(PlatingPower)] = new(
+            PlayEffect: (_, _, _) => CardPlayEffect.None,
+            EndTurn: (_, _) => EndTurnState.Active,
+            CountText: (power, _) => power.Amount.ToString(),
+            Primed: (_, _) => false,
+            EndTurnTip: (power, _, _) => new BadgeTip(
+                Title(power),
+                $"Will gain {power.Amount} Block when this turn ends.")),
+
         // Panache: every fifth play hits all enemies; the counter is public via its
         // CardsLeft DynamicVar and counts down. It fires at zero and restarts from
         // five (mirrors the power's private _baseCardsLeft const).

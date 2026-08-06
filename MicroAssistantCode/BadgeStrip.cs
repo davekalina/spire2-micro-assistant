@@ -29,11 +29,12 @@ internal static class BadgeStrip
     private static readonly Color CountShadow = new(0f, 0f, 0f, 0.188235f);
     private static readonly Color CountOutline = new(0.12f, 0.10208f, 0.0816f);
 
-    // The X is translucent and lightly outlined so the source icon stays readable
-    // under it; the icon itself is not dimmed.
-    private const int BrokenFontSize = 30;
-    private static readonly Color BrokenRed = new(
-        StsColors.red.R, StsColors.red.G, StsColors.red.B, 0.8f);
+    // The broken mark is the game's own "can't play this" slash roundel — the one
+    // the cost gem wears at Velvet Choker's limit — slightly translucent so the
+    // source icon stays readable under it.
+    private const string BrokenTexturePath =
+        "res://images/atlases/ui_atlas.sprites/card/card_unplayable_icon.tres";
+    private static readonly Color BrokenModulate = new(1f, 1f, 1f, 0.85f);
 
     // HoverTip's Title and Description only have private setters; the seed LocString
     // is discarded once both are overwritten. Same approach Hypergeo ships.
@@ -275,22 +276,18 @@ internal static class BadgeStrip
         return label;
     }
 
-    /// <summary>The X for a play that would break the source, centered over the icon.</summary>
-    private static MegaLabel BrokenMark(float scale)
+    /// <summary>The slash for a play that would break the source, over the icon.</summary>
+    private static TextureRect BrokenMark(float scale) => new()
     {
-        var label = new MegaLabel
-        {
-            Text = "X",
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-            AutoSizeEnabled = false,
-            OffsetRight = IconSize * scale,
-            OffsetBottom = IconSize * scale,
-        };
-        Style(label, (int)(BrokenFontSize * scale), BrokenRed, (int)(6 * scale));
-        return label;
-    }
+        // Loaded per badge rather than cached in a static; see Style's note.
+        Texture = ResourceLoader.Load<Texture2D>(BrokenTexturePath),
+        ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+        StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+        MouseFilter = Control.MouseFilterEnum.Ignore,
+        Modulate = BrokenModulate,
+        OffsetRight = IconSize * scale,
+        OffsetBottom = IconSize * scale,
+    };
 
     private static void Style(MegaLabel label, int fontSize, Color color, int outlineSize)
     {

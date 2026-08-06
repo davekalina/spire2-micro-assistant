@@ -43,15 +43,20 @@ internal sealed class CombatOverlayView : IDisposable
     private const float HandStripBottom = -264f;
     private const float OverlayCenter = -88f;
     private const float ReplaceCountBottom = -224f;
-    private const float HandStripHalfWidth = 150f;
+    // Wide enough that a many-badge panel still has free space to center in; an
+    // HBox only centers within free space, and a panel wider than the band used
+    // to pin left and read as off-center.
+    private const float HandStripHalfWidth = 400f;
 
     // The End Turn button root is 220x90; this band hugs its top edge (the
     // multiplayer vote row at y -15..15 only exists in co-op, and drawing over it
     // was accepted in exchange for proximity). The replacement face is the
     // ReplaceEndTurn variant: the native Visuals hide entirely and a taller backed
     // face spans the badge row plus the End Turn text over the same click region.
-    private const float EndTurnStripLeft = -16f;
-    private const float EndTurnStripRight = 233f;
+    // Wide band, same center as the button (108.5), so a long badge row centers
+    // instead of pinning left.
+    private const float EndTurnStripLeft = -141f;
+    private const float EndTurnStripRight = 358f;
     private const float EndTurnStripTop = -46f;
     private const float EndTurnStripBottom = -6f;
     private const float FaceLeft = -10f;

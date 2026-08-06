@@ -22,8 +22,9 @@ internal static class ViewOptions
     public static bool CardOverlay;
 
     /// <summary>Hide the native hand-count digit; the strip absorbs it as a "N."
-    /// prefix and moves down over the digit's old spot.</summary>
-    public static bool ReplaceCardCount;
+    /// prefix and moves down over the digit's old spot. On by default: it won its
+    /// audition.</summary>
+    public static bool ReplaceCardCount = true;
 
     /// <summary>End Turn badges render as a flush extension on top of the End Turn
     /// button instead of floating above it.</summary>
