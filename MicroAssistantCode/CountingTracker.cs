@@ -49,7 +49,8 @@ internal static class CountingTracker
         Func<RelicModel, string?> CountText,
         Func<RelicModel, bool> Primed,
         Func<RelicModel, EndTurnState, BadgeTip?> EndTurnTip,
-        Func<RelicModel, CardModel, string?>? NextCount = null);
+        Func<RelicModel, CardModel, string?>? NextCount = null,
+        bool Persistent = false);
 
     private sealed record PowerSemantics(
         Func<PowerModel, Player, CardModel, CardPlayEffect> PlayEffect,
@@ -103,8 +104,9 @@ internal static class CountingTracker
 
         // Art of War: playing no attacks earns energy at the start of next turn.
         [typeof(ArtOfWar)] = new(
-            PlayEffect: (_, card) =>
-                CountingRules.AvoidancePlay(card.Type == CardType.Attack),
+            PlayEffect: (relic, card) => CountingRules.AvoidancePlay(
+                card.Type == CardType.Attack,
+                payoffIntact: !CombatQueries.AnyAttackPlayedThisTurn(relic.Owner)),
             EndTurn: relic => CountingRules.AvoidanceEndTurn(
                 !CombatQueries.AnyAttackPlayedThisTurn(relic.Owner)),
             CountText: _ => null,
@@ -117,8 +119,9 @@ internal static class CountingTracker
 
         // Ripple Basin: playing no attacks grants Block when the turn ends.
         [typeof(RippleBasin)] = new(
-            PlayEffect: (_, card) =>
-                CountingRules.AvoidancePlay(card.Type == CardType.Attack),
+            PlayEffect: (relic, card) => CountingRules.AvoidancePlay(
+                card.Type == CardType.Attack,
+                payoffIntact: !CombatQueries.AnyAttackPlayedThisTurn(relic.Owner)),
             EndTurn: relic => CountingRules.AvoidanceEndTurn(
                 !CombatQueries.AnyAttackPlayedThisTurn(relic.Owner)),
             CountText: relic => IntVar(relic, "Block").ToString(),
@@ -159,20 +162,21 @@ internal static class CountingTracker
         // ---- Every-Nth card tickers (count on the native bar; the badge adds
         //      "this card advances it") ----------------------------------------
 
-        [typeof(Nunchaku)] = AttackTicker(),
+        [typeof(Nunchaku)] = AttackTicker(persistent: true),
         [typeof(Kunai)] = AttackTicker(),
         [typeof(Shuriken)] = AttackTicker(),
         [typeof(OrnamentalFan)] = AttackTicker(),
         [typeof(Kusarigama)] = AttackTicker(),
         [typeof(LetterOpener)] = SkillTicker(),
-        [typeof(TuningFork)] = SkillTicker(),
-        [typeof(IronClub)] = AnyCardTicker(),
+        [typeof(TuningFork)] = SkillTicker(persistent: true),
+        [typeof(IronClub)] = AnyCardTicker(persistent: true),
 
         // Joss Paper counts exhausted cards. Exhaust-keyword cards advance it on
         // play; Ethereal cards carry the badge as a reminder — they feed it only if
         // the turn ends with them in hand, so playing one neither advances the
         // count nor projects a next value.
         [typeof(JossPaper)] = new(
+            Persistent: true,
             PlayEffect: (_, card) => CountingRules.TickerPlay(
                 card.Keywords.Contains(CardKeyword.Exhaust) ||
                 card.Keywords.Contains(CardKeyword.Ethereal)),
@@ -189,6 +193,7 @@ internal static class CountingTracker
 
         // Pen Nib's threshold is a const, so it cannot use the DynamicVar tickers.
         [typeof(PenNib)] = new(
+            Persistent: true,
             PlayEffect: (_, card) =>
                 CountingRules.PenNibPlay(card.Type == CardType.Attack),
             EndTurn: _ => CountingRules.PenNibEndTurn(),
@@ -250,6 +255,7 @@ internal static class CountingTracker
         // ---- Turn tickers -----------------------------------------------------
 
         [typeof(Pendulum)] = new(
+            Persistent: true,
             PlayEffect: (_, _) => CountingRules.PendulumPlay(),
             EndTurn: relic =>
                 CountingRules.PendulumEndTurn(((Pendulum)relic).TurnsSeen, IntVar(relic, "Turns")),
@@ -261,6 +267,7 @@ internal static class CountingTracker
                 $"Will draw {Cards(relic)} extra {CardWord(Cards(relic))} next turn.")),
 
         [typeof(HappyFlower)] = new(
+            Persistent: true,
             PlayEffect: (_, _) => CardPlayEffect.None,
             EndTurn: relic =>
                 CountingRules.PendulumEndTurn(((HappyFlower)relic).TurnsSeen, IntVar(relic, "Turns")),
@@ -272,6 +279,7 @@ internal static class CountingTracker
                 $"Will gain {IntVar(relic, "Energy")} energy next turn.")),
 
         [typeof(FakeHappyFlower)] = new(
+            Persistent: true,
             PlayEffect: (_, _) => CardPlayEffect.None,
             EndTurn: relic => CountingRules.PendulumEndTurn(
                 ((FakeHappyFlower)relic).TurnsSeen, IntVar(relic, "Turns")),
@@ -284,6 +292,7 @@ internal static class CountingTracker
 
         // Pollinous Core counts turns without wrapping and resets after it fires.
         [typeof(PollinousCore)] = new(
+            Persistent: true,
             PlayEffect: (_, _) => CardPlayEffect.None,
             EndTurn: relic => CountingRules.PollinousEndTurn(
                 ((PollinousCore)relic).TurnsSeen, IntVar(relic, "Turns")),
@@ -529,6 +538,27 @@ internal static class CountingTracker
         return badges;
     }
 
+    /// <summary>
+    /// The setup bar: the run-persistent relics, whose counters carry between
+    /// combats, so their state is worth seeing before a card is ever hovered.
+    /// </summary>
+    public static List<SourceBadge> ForSetup(Player player)
+    {
+        var badges = new List<SourceBadge>();
+        foreach (var (relic, semantics) in TrackedRelicPairs(player))
+        {
+            if (!semantics.Persistent)
+                continue;
+            badges.Add(new SourceBadge(
+                relic.Icon,
+                relic.Id.Entry,
+                semantics.CountText(relic) ?? relic.DisplayAmount.ToString(),
+                Broken: false,
+                semantics.Primed(relic)));
+        }
+        return badges;
+    }
+
     /// <summary>The player's relics this mod understands, for event subscription.</summary>
     public static IEnumerable<RelicModel> TrackedRelics(Player player) =>
         TrackedRelicPairs(player).Select(pair => pair.Relic);
@@ -559,29 +589,33 @@ internal static class CountingTracker
 
     // ---- Entry builders -------------------------------------------------------
 
-    private static RelicSemantics AttackTicker() =>
-        Ticker(card => card.Type == CardType.Attack);
+    private static RelicSemantics AttackTicker(bool persistent = false) =>
+        Ticker(card => card.Type == CardType.Attack, persistent);
 
-    private static RelicSemantics SkillTicker() =>
-        Ticker(card => card.Type == CardType.Skill);
+    private static RelicSemantics SkillTicker(bool persistent = false) =>
+        Ticker(card => card.Type == CardType.Skill, persistent);
 
-    private static RelicSemantics AnyCardTicker() => Ticker(_ => true);
+    private static RelicSemantics AnyCardTicker(bool persistent = false) =>
+        Ticker(_ => true, persistent);
 
     /// <summary>
     /// Every-Nth relics whose DisplayAmount is the wrapped count and whose threshold
     /// is their Cards DynamicVar.
     /// </summary>
-    private static RelicSemantics Ticker(Func<CardModel, bool> matches) => new(
+    private static RelicSemantics Ticker(
+        Func<CardModel, bool> matches, bool persistent = false) => new(
         PlayEffect: (_, card) => CountingRules.TickerPlay(matches(card)),
         EndTurn: _ => EndTurnState.Hidden,
         CountText: relic => relic.DisplayAmount.ToString(),
         Primed: relic => CountingRules.IsPrimed(relic.DisplayAmount, Cards(relic)),
         EndTurnTip: (_, _) => null,
         NextCount: (relic, _) =>
-            CountingRules.NextWrapped(relic.DisplayAmount, Cards(relic)).ToString());
+            CountingRules.NextWrapped(relic.DisplayAmount, Cards(relic)).ToString(),
+        Persistent: persistent);
 
     private static RelicSemantics OrichalcumEntry() => new(
-        PlayEffect: (_, card) => CountingRules.OrichalcumPlay(card.GainsBlock),
+        PlayEffect: (relic, card) => CountingRules.OrichalcumPlay(
+            card.GainsBlock, payoffIntact: relic.Owner.Creature.Block == 0),
         EndTurn: relic => CountingRules.OrichalcumEndTurn(relic.Owner.Creature.Block),
         CountText: relic => IntVar(relic, "Block").ToString(),
         Primed: _ => false,

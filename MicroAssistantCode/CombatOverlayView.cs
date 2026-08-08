@@ -79,6 +79,7 @@ internal sealed class CombatOverlayView : IDisposable
     // band height is computed from the badge scale on every refresh, like the
     // hand strips, so the backing hugs the icons at either size.
     private const float TopPanelAnchorY = 0.2f;
+    private const float PanelGap = 6f;
 
     private readonly NCombatUi _ui;
     private readonly List<RelicModel> _subscribedRelics = [];
@@ -88,8 +89,12 @@ internal sealed class CombatOverlayView : IDisposable
     private HBoxContainer? _endTurnStrip;
     private HBoxContainer? _endTurnExtension;
     private HBoxContainer? _topPanel;
+    private HBoxContainer? _setupPanel;
     private MegaLabel? _faceLabel;
     private Player? _player;
+
+    /// <summary>Whether the setup bar is currently taking room above the top panel.</summary>
+    private bool _setupVisible;
 
     public CombatOverlayView(NCombatUi ui) => _ui = ui;
 
@@ -121,6 +126,17 @@ internal sealed class CombatOverlayView : IDisposable
         _topPanel.ZAsRelative = false;
         _topPanel.ZIndex = InPlayZ;
         _ui.AddChild(_topPanel);
+
+        // The setup bar shares the top panel's home and takes the upper slot; the
+        // card panel drops below it when both are up.
+        _setupPanel = BadgeStrip.CreateTriggerBanner("MicroAssistantSetupPanel");
+        _setupPanel.AnchorLeft = 0f;
+        _setupPanel.AnchorRight = 1f;
+        _setupPanel.AnchorTop = TopPanelAnchorY;
+        _setupPanel.AnchorBottom = TopPanelAnchorY;
+        _setupPanel.ZAsRelative = false;
+        _setupPanel.ZIndex = InPlayZ;
+        _ui.AddChild(_setupPanel);
 
         Guard.Run("Attaching the view options panel", () =>
         {
@@ -172,6 +188,7 @@ internal sealed class CombatOverlayView : IDisposable
         FreeStrip(ref _endTurnStrip);
         FreeStrip(ref _endTurnExtension);
         FreeStrip(ref _topPanel);
+        FreeStrip(ref _setupPanel);
         _options.Dispose();
     }
 
@@ -291,16 +308,47 @@ internal sealed class CombatOverlayView : IDisposable
         Diag.Once("endturn", () =>
             $"End Turn strip refreshed: {badges.Count} badge(s), " +
             $"player {(_player == null ? "unbound" : "bound")}.");
+        var scale = AmbientScale();
         if (_endTurnStrip != null && GodotObject.IsInstanceValid(_endTurnStrip))
         {
             _endTurnStrip.OffsetLeft = EndTurnStripLeft;
             _endTurnStrip.OffsetRight = EndTurnStripRight;
-            _endTurnStrip.OffsetTop = EndTurnStripTop;
             _endTurnStrip.OffsetBottom = EndTurnStripBottom;
+            _endTurnStrip.OffsetTop = EndTurnStripBottom - BadgeRowHeight * scale;
             BadgeStrip.SetBadges(
-                _endTurnStrip, ViewOptions.ReplaceEndTurn ? [] : badges);
+                _endTurnStrip, ViewOptions.ReplaceEndTurn ? [] : badges, scale: scale);
         }
-        RefreshEndTurnFace(badges);
+        RefreshEndTurnFace(badges, scale);
+        RefreshSetupPanel();
+    }
+
+    /// <summary>
+    /// The size for surfaces that are not the focused card's display: 1 unless
+    /// "Scale Always On" extends the slider to everything.
+    /// </summary>
+    private static float AmbientScale() =>
+        ViewOptions.ScaleAlwaysOn ? ViewOptions.Scale : 1f;
+
+    /// <summary>
+    /// The always-on setup bar: the run-persistent relics, whose counters carry
+    /// between combats. It takes the upper slot at the top-panel anchor, and the
+    /// card panel stacks beneath it.
+    /// </summary>
+    private void RefreshSetupPanel()
+    {
+        if (_setupPanel == null || !GodotObject.IsInstanceValid(_setupPanel))
+            return;
+        var badges = ViewOptions.ShowSetupRelics && _player != null &&
+            CombatManager.Instance.IsInProgress
+                ? CountingTracker.ForSetup(_player)
+                : [];
+        var scale = AmbientScale();
+        var half = (BadgeRowHeight * scale + BackingInsets) / 2f;
+        _setupPanel.OffsetTop = -half;
+        _setupPanel.OffsetBottom = half;
+        BadgeStrip.SetBadges(_setupPanel, badges, backed: true, scale: scale);
+        _setupPanel.Visible = badges.Count > 0;
+        _setupVisible = badges.Count > 0;
     }
 
     /// <summary>
@@ -312,7 +360,7 @@ internal sealed class CombatOverlayView : IDisposable
     /// click region, everything over the button ignores the mouse, and the native
     /// long-press bar is pulled in front of the backing so it stays visible.
     /// </summary>
-    private void RefreshEndTurnFace(List<SourceBadge> badges)
+    private void RefreshEndTurnFace(List<SourceBadge> badges, float scale)
     {
         if (_endTurnExtension == null || !GodotObject.IsInstanceValid(_endTurnExtension))
             return;
@@ -332,7 +380,7 @@ internal sealed class CombatOverlayView : IDisposable
         var rowCount = (badges.Count + FaceBadgesPerRow - 1) / FaceBadgesPerRow;
         _endTurnExtension.OffsetBottom = FaceLabelDip;
         _endTurnExtension.OffsetTop = FaceLabelDip -
-            (BackingInsets + rowCount * FaceRowHeight + FaceLabelHeight);
+            (BackingInsets + rowCount * FaceRowHeight * scale + FaceLabelHeight);
 
         var column = new VBoxContainer
         {
@@ -344,7 +392,7 @@ internal sealed class CombatOverlayView : IDisposable
         {
             var row = BadgeStrip.CreateContainer("Badges");
             BadgeStrip.SetBadges(
-                row, badges.Skip(start).Take(FaceBadgesPerRow).ToList());
+                row, badges.Skip(start).Take(FaceBadgesPerRow).ToList(), scale: scale);
             column.AddChild(row);
         }
         var native = _ui.EndTurnButton.GetNodeOrNull<Label>("Visuals/Label");
@@ -459,11 +507,14 @@ internal sealed class CombatOverlayView : IDisposable
             _handStrips[holder] = strip;
         }
 
-        // The scale slider sizes only the active card's display, and only while
-        // that display lives on the card (Show Up Top sizes the top panel instead).
+        // The scale slider sizes the active card's display while it lives on the
+        // card (Show Up Top sizes the top panel instead); "Scale Always On"
+        // extends it to every strip, focused or not.
         var active = projected ||
             holder == NPlayerHand.Instance?.FocusedHolder;
-        var scale = active && !ViewOptions.ShowUpTop ? ViewOptions.Scale : 1f;
+        var scale = ViewOptions.ScaleAlwaysOn || (active && !ViewOptions.ShowUpTop)
+            ? ViewOptions.Scale
+            : 1f;
         var height = BadgeRowHeight * scale + BackingInsets;
         var (top, bottom) = ViewOptions.CardOverlay
             ? (OverlayCenter - height / 2f, OverlayCenter + height / 2f)
@@ -527,8 +578,12 @@ internal sealed class CombatOverlayView : IDisposable
     private void SizeTopPanel(float scale)
     {
         var half = (BadgeRowHeight * scale + BackingInsets) / 2f;
-        _topPanel!.OffsetTop = -half;
-        _topPanel.OffsetBottom = half;
+        // Stack under the setup bar when it is up, so the two never overlap.
+        var shift = _setupVisible
+            ? BadgeRowHeight * AmbientScale() + BackingInsets + PanelGap
+            : 0f;
+        _topPanel!.OffsetTop = -half + shift;
+        _topPanel.OffsetBottom = half + shift;
     }
 
     /// <summary>

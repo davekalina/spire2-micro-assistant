@@ -36,10 +36,12 @@ public static class CountingRules
     /// <summary>
     /// Pocketwatch draws extra next turn if this turn ends with at most
     /// <paramref name="cardThreshold" /> cards played. Every card play counts, so the
-    /// question for a hovered card is whether it is the play that goes over.
+    /// question for a hovered card is whether it is the play that goes over — and
+    /// once the payoff is already spent, the card has nothing left to break.
     /// </summary>
     public static CardPlayEffect PocketwatchPlay(int cardsPlayedThisTurn, int cardThreshold) =>
-        cardsPlayedThisTurn >= cardThreshold ? CardPlayEffect.Breaks : CardPlayEffect.Contributes;
+        cardsPlayedThisTurn < cardThreshold ? CardPlayEffect.Contributes :
+        cardsPlayedThisTurn == cardThreshold ? CardPlayEffect.Breaks : CardPlayEffect.None;
 
     public static EndTurnState PocketwatchEndTurn(int cardsPlayedThisTurn, int cardThreshold) =>
         cardsPlayedThisTurn <= cardThreshold ? EndTurnState.Active : EndTurnState.Broken;
@@ -85,10 +87,11 @@ public static class CountingRules
 
     /// <summary>
     /// "Don't do X this turn" (Art of War, Ripple Basin): a matching play forfeits
-    /// the payoff, and keeps reading as forfeited for the rest of the turn.
+    /// the payoff — but only while there is still a payoff to forfeit. Once this
+    /// turn's is gone, the warning is noise.
     /// </summary>
-    public static CardPlayEffect AvoidancePlay(bool cardMatches) =>
-        cardMatches ? CardPlayEffect.Breaks : CardPlayEffect.None;
+    public static CardPlayEffect AvoidancePlay(bool cardMatches, bool payoffIntact) =>
+        cardMatches && payoffIntact ? CardPlayEffect.Breaks : CardPlayEffect.None;
 
     public static EndTurnState AvoidanceEndTurn(bool conditionIntact) =>
         conditionIntact ? EndTurnState.Active : EndTurnState.Broken;
@@ -133,11 +136,12 @@ public static class CountingRules
         showSpentX ? CardPlayEffect.Breaks : CardPlayEffect.None;
 
     /// <summary>
-    /// Orichalcum: gaining block is always the argument against it; the End Turn
-    /// verdict is simply whether block is zero right now.
+    /// Orichalcum: gaining block is the argument against it, but only while it
+    /// still has a payoff to lose — with block already up, a block card costs
+    /// nothing further. The End Turn verdict is simply whether block is zero.
     /// </summary>
-    public static CardPlayEffect OrichalcumPlay(bool cardGainsBlock) =>
-        cardGainsBlock ? CardPlayEffect.Breaks : CardPlayEffect.None;
+    public static CardPlayEffect OrichalcumPlay(bool cardGainsBlock, bool payoffIntact) =>
+        cardGainsBlock && payoffIntact ? CardPlayEffect.Breaks : CardPlayEffect.None;
 
     public static EndTurnState OrichalcumEndTurn(int currentBlock) =>
         currentBlock == 0 ? EndTurnState.Active : EndTurnState.Broken;

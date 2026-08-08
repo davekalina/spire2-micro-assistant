@@ -7,11 +7,14 @@ public class CountingRulesTests
 {
     // Pocketwatch: draw 3 next turn if at most 3 cards are played this turn.
     // Counts already played this turn: 0..2 leave room, 3 means the next play breaks it.
+    // Past the threshold the payoff is already gone, so the card has nothing left
+    // to break and the badge goes quiet.
     [Theory]
     [InlineData(0, CardPlayEffect.Contributes)]
     [InlineData(2, CardPlayEffect.Contributes)]
     [InlineData(3, CardPlayEffect.Breaks)]
-    [InlineData(7, CardPlayEffect.Breaks)]
+    [InlineData(4, CardPlayEffect.None)]
+    [InlineData(7, CardPlayEffect.None)]
     public void Pocketwatch_card_play(int cardsPlayed, CardPlayEffect expected) =>
         Assert.Equal(expected, CountingRules.PocketwatchPlay(cardsPlayed, cardThreshold: 3));
 
@@ -78,12 +81,14 @@ public class CountingRulesTests
     public void Choker_cap(int played, CardPlayEffect expected) =>
         Assert.Equal(expected, CountingRules.ChokerPlay(played, limit: 6));
 
-    // Art of War / Ripple Basin: attacks always argue against the payoff.
+    // Art of War / Ripple Basin: attacks argue against the payoff, but only while
+    // there is still one to lose.
     [Theory]
-    [InlineData(true, CardPlayEffect.Breaks)]
-    [InlineData(false, CardPlayEffect.None)]
-    public void Avoidance_play(bool isMatch, CardPlayEffect expected) =>
-        Assert.Equal(expected, CountingRules.AvoidancePlay(isMatch));
+    [InlineData(true, true, CardPlayEffect.Breaks)]
+    [InlineData(false, true, CardPlayEffect.None)]
+    [InlineData(true, false, CardPlayEffect.None)]
+    public void Avoidance_play(bool isMatch, bool intact, CardPlayEffect expected) =>
+        Assert.Equal(expected, CountingRules.AvoidancePlay(isMatch, intact));
 
     [Theory]
     [InlineData(true, EndTurnState.Active)]
@@ -133,12 +138,13 @@ public class CountingRulesTests
     public void First_match_play(bool matches, bool armed, bool spentX, CardPlayEffect expected) =>
         Assert.Equal(expected, CountingRules.FirstMatchPlay(matches, armed, spentX));
 
-    // Orichalcum: block cards always argue against it; verdict is block == 0.
+    // Orichalcum: block cards argue against it only while block is still zero.
     [Theory]
-    [InlineData(true, CardPlayEffect.Breaks)]
-    [InlineData(false, CardPlayEffect.None)]
-    public void Orichalcum_play(bool gainsBlock, CardPlayEffect expected) =>
-        Assert.Equal(expected, CountingRules.OrichalcumPlay(gainsBlock));
+    [InlineData(true, true, CardPlayEffect.Breaks)]
+    [InlineData(false, true, CardPlayEffect.None)]
+    [InlineData(true, false, CardPlayEffect.None)]
+    public void Orichalcum_play(bool gainsBlock, bool intact, CardPlayEffect expected) =>
+        Assert.Equal(expected, CountingRules.OrichalcumPlay(gainsBlock, intact));
 
     [Theory]
     [InlineData(0, EndTurnState.Active)]

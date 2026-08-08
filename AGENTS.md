@@ -73,9 +73,18 @@ powers" — refreshed each open, so a badge-less run is diagnosable at a glance.
 The experimental view controls (session-only except where noted, behind the
 settings-gear icon left of the version text, `ViewOptions` + `OptionsPanel`):
 a **badge scale slider** (0.5–3.0 in 0.05 steps; replaced the Big & Bold toggle,
-which was scale 2.0) plus six switches — Replace Card Count defaults ON, it won
+which was scale 2.0) plus eight switches — Replace Card Count defaults ON, it won
 its audition; **Hide Negated Payoffs** drops the slashed will-NOT End Turn
-badges instead of showing them. End Turn badges fade with the button's own
+badges instead of showing them; **Scale Always On** extends the slider from the
+focused card's display to every badge surface; **Setup Relics Bar** shows the
+nine run-persistent relics (Pen Nib, Nunchaku, Tuning Fork, Iron Club, Joss
+Paper, Pendulum, both Happy Flowers, Pollinous Core — the `Persistent` registry
+flag, matching the game's `[SavedProperty]` counters) in the top-panel slot,
+always on while enabled, with the card panel stacking beneath it.
+
+"Don't do X" payoffs (Pocketwatch, Art of War, Ripple Basin, Orichalcum) slash a
+card **only while the payoff is still winnable**; once this turn's is already
+lost, the card badge goes quiet rather than nagging. End Turn badges fade with the button's own
 AnimOut/AnimIn so nothing pokes above the screen bottom between turns; the
 Replace End Turn face wraps badges four per row and keeps every tooltip cell
 above the button's click region (a cell over the button would swallow presses): **Scale slider**
@@ -99,6 +108,8 @@ Any directional change must be applied across all of these:
 - the "Triggers [icons]" banner (top-center at 20% down the screen; visible only
   while a play in progress will fire a source: primed counters, armed first-X
   sources, active allowances);
+- the setup bar and its stacking with the top panel (both on, either alone,
+  and at every slider scale);
 - the badge strip above the End Turn button (active, X-ed out, hidden states; enemy
   turn, when the strip rides the button's slide-out tween);
 - the hover tips on End Turn badges (will / will NOT wording, counts read from the

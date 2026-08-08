@@ -18,6 +18,10 @@ powers react to what you are about to do.
   shows a native tooltip spelling it out — "Will draw 3 extra cards next turn." or
   "Will NOT".
 
+An optional always-on **setup bar** lists the run-persistent relics — the ones
+whose counters carry between combats — so you can see where they stand before
+hovering anything.
+
 An upper-right panel on the combat screen (under the version/seed block) offers
 live experimental view switches: Big & Bold, Always On, Card Overlay, Replace
 Card Count, and Replace End Turn Button.

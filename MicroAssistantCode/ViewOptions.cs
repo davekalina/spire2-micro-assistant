@@ -14,6 +14,14 @@ internal static class ViewOptions
     /// </summary>
     public static float Scale = 1f;
 
+    /// <summary>Apply Scale to every badge surface, not just the focused card's
+    /// display — unfocused hand strips, End Turn, and the setup bar too.</summary>
+    public static bool ScaleAlwaysOn;
+
+    /// <summary>Show the always-on setup bar: the run-persistent relics, whose
+    /// counters carry between combats, with their current counts.</summary>
+    public static bool ShowSetupRelics;
+
     /// <summary>The focused card's badge display moves to the top-center panel
     /// (sized by BigAndBold, never showing the card number).</summary>
     public static bool ShowUpTop;

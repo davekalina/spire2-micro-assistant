@@ -46,7 +46,7 @@
 
 <header>
   <h1>Micro Assistant &mdash; Counting Sources</h1>
-  <div class="sub">v0.3.0 &middot; badges above the hovered card and the End Turn button</div>
+  <div class="sub">badges above the hovered card and the End Turn button &middot; <b>bold</b> = run-persistent (setup bar)</div>
 </header>
 
 <div class="legend">
@@ -86,11 +86,11 @@
 
   <h2>Don&rsquo;t-Do-X Payoffs <span class="where">card + end turn</span></h2>
   <table>
-    <tr><td class="n">Art of War</td><td><b>No attacks</b> this turn &rarr; +1 energy next turn. Attacks show X.</td></tr>
-    <tr><td class="n">Ripple Basin</td><td><b>No attacks</b> this turn &rarr; 4 Block at turn end. Attacks show X.</td></tr>
+    <tr><td class="n">Art of War</td><td><b>No attacks</b> this turn &rarr; +1 energy next turn. Attacks are slashed while the payoff is still live.</td></tr>
+    <tr><td class="n">Ripple Basin</td><td><b>No attacks</b> this turn &rarr; 4 Block at turn end. Attacks are slashed while the payoff is still live; badge shows the Block.</td></tr>
     <tr><td class="n">Pael&rsquo;s Eye <span class="sub">once/combat</span></td><td><b>No cards at all</b> this turn &rarr; exhaust hand, take an extra turn. Every card shows X while live.</td></tr>
     <tr><td class="n">Rainbow Ring <span class="sub">per turn</span></td><td>Attack + Skill + Power in one turn &rarr; +1 Str, +1 Dex. Badge on still-missing types; count = types filled.</td></tr>
-    <tr><td class="n">Orichalcum <span class="sub">+ Fake</span></td><td>End the turn at <b>0 Block</b> &rarr; gain 6 (Fake: 3) Block. Block-gaining cards always show X.</td></tr>
+    <tr><td class="n">Orichalcum <span class="sub">+ Fake</span></td><td>End the turn at <b>0 Block</b> &rarr; gain 6 (Fake: 3) Block. Block-gaining cards are slashed only while your Block is still 0.</td></tr>
   </table>
 
   <h2>Situational Reminders</h2>
@@ -139,6 +139,8 @@
 
 <footer>
   Counts are read from the game&rsquo;s own values, so badges always match the relic bar and power icons.
+  The optional setup bar lists the nine run-persistent relics, whose counters carry between combats:
+  Pen Nib, Nunchaku, Tuning Fork, Iron Club, Joss Paper, Pendulum, Happy Flower, Fake Happy Flower, Pollinous Core.
   Not tracked (by design): locks such as Sloth/Smoggy/Ringing and Normality, end-turn reversals (Tender, Monologue),
   Unsettling Lamp, and out-of-combat counters &mdash; the game already communicates those.
   &nbsp;&middot;&nbsp; Micro Assistant &middot; github.com/davekalina/spire2-micro-assistant

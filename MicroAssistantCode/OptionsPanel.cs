@@ -96,7 +96,11 @@ internal sealed class OptionsPanel : IDisposable
         rows.AddChild(_statusLine);
 
         AddScaleSlider(rows);
+        AddToggle(rows, "Scale Always On",
+            () => ViewOptions.ScaleAlwaysOn, v => ViewOptions.ScaleAlwaysOn = v);
         AddToggle(rows, "Show Up Top", () => ViewOptions.ShowUpTop, v => ViewOptions.ShowUpTop = v);
+        AddToggle(rows, "Setup Relics Bar",
+            () => ViewOptions.ShowSetupRelics, v => ViewOptions.ShowSetupRelics = v);
         AddToggle(rows, "Always On", () => ViewOptions.AlwaysOn, v => ViewOptions.AlwaysOn = v);
         AddToggle(rows, "Card Overlay",
             () => ViewOptions.CardOverlay, v => ViewOptions.CardOverlay = v);
@@ -116,7 +120,7 @@ internal sealed class OptionsPanel : IDisposable
         _dropdown.OffsetLeft = -352f;
         _dropdown.OffsetRight = -12f;
         _dropdown.OffsetTop = 134f;
-        _dropdown.OffsetBottom = 388f;
+        _dropdown.OffsetBottom = 452f;
         _root.AddChild(_dropdown);
 
         parent.AddChild(_root);
