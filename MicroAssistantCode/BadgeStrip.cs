@@ -48,6 +48,13 @@ internal static class BadgeStrip
 
     private const float BannerIconSize = 40f;
 
+    // A panel's caption: the same Kreon face as the counts, in the game's gold, on
+    // its own line above the icons and inside the same backing. TitleRowHeight is
+    // the height it reserves at scale 1 — callers sizing a titled panel must add
+    // TitleRowHeight * scale to the band, or the backing clips the icons.
+    private const int TitleFontSize = 20;
+    public const float TitleRowHeight = 28f;
+
     // The native tooltip backing: images/ui/hover_tip.png as a nine-patch, with a
     // 25% black copy offset behind it as the shadow, inside a MarginContainer whose
     // content margins match the art's borders. Straight from ui/hover_tip.tscn.
@@ -67,7 +74,9 @@ internal static class BadgeStrip
     }
 
     /// <summary>Rebuild the banner for these badges; hidden when none trigger.</summary>
-    public static void SetTriggerIcons(HBoxContainer banner, IReadOnlyList<SourceBadge> triggering)
+    public static void SetTriggerIcons(
+        HBoxContainer banner, IReadOnlyList<SourceBadge> triggering, float scale = 1f,
+        string? title = null)
     {
         foreach (var child in banner.GetChildren())
         {
@@ -83,17 +92,41 @@ internal static class BadgeStrip
             Alignment = BoxContainer.AlignmentMode.Center,
             MouseFilter = Control.MouseFilterEnum.Ignore,
         };
-        icons.AddThemeConstantOverride("separation", 8);
+        icons.AddThemeConstantOverride("separation", (int)(8 * scale));
         foreach (var badge in triggering)
             icons.AddChild(new TextureRect
             {
                 Texture = badge.Icon,
-                CustomMinimumSize = new Vector2(BannerIconSize, BannerIconSize),
+                CustomMinimumSize = new Vector2(BannerIconSize, BannerIconSize) * scale,
                 ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                 StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                 MouseFilter = Control.MouseFilterEnum.Ignore,
             });
-        banner.AddChild(BackedPanel(icons));
+        banner.AddChild(BackedPanel(title == null ? icons : Titled(title, icons, scale)));
+    }
+
+    /// <summary>
+    /// A caption stacked over a row, both inside one backing, so the panel says
+    /// what it is. Separation is zero: TitleRowHeight is the whole line, which is
+    /// what the caller's band arithmetic assumes.
+    /// </summary>
+    private static Control Titled(string title, Control row, float scale)
+    {
+        var column = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+        column.AddThemeConstantOverride("separation", 0);
+        var caption = new MegaLabel
+        {
+            Text = title,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            AutoSizeEnabled = false,
+            CustomMinimumSize = new Vector2(0f, TitleRowHeight * scale),
+        };
+        Style(caption, (int)(TitleFontSize * scale), StsColors.gold, (int)(8 * scale));
+        column.AddChild(caption);
+        column.AddChild(row);
+        return column;
     }
 
     /// <summary>
@@ -156,12 +189,13 @@ internal static class BadgeStrip
     /// Replace the strip's badges. An empty list leaves the strip blank. With
     /// <paramref name="backed" /> the row sits on the native tooltip backing — for
     /// strips that float over busy art rather than on an existing panel. Scale
-    /// multiplies every badge metric (Big &amp; Bold doubles it); a prefix becomes a
-    /// leading label, used to absorb the native hand-count digit.
+    /// multiplies every badge metric; a prefix becomes a leading label, used to
+    /// absorb the native hand-count digit; a title captions the panel on its own
+    /// line and needs <paramref name="backed" /> to have a panel to caption.
     /// </summary>
     public static void SetBadges(
         HBoxContainer strip, IReadOnlyList<SourceBadge> badges, bool backed = false,
-        float scale = 1f, string? prefix = null)
+        float scale = 1f, string? prefix = null, string? title = null)
     {
         foreach (var child in strip.GetChildren())
         {
@@ -198,7 +232,7 @@ internal static class BadgeStrip
         foreach (var badge in badges)
             row.AddChild(CreateBadge(badge, scale));
         if (!ReferenceEquals(row, strip))
-            strip.AddChild(BackedPanel(row));
+            strip.AddChild(BackedPanel(title == null ? row : Titled(title, row, scale)));
     }
 
     private static Control CreateBadge(SourceBadge badge, float scale = 1f)

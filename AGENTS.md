@@ -83,10 +83,11 @@ counters) in the top-panel slot, always on while enabled, with the card panel
 stacking beneath it.
 
 The slider governs the mod's **own** panels directly — the focused card's
-display and the setup bar — so the setup bar is 1.5 out of the box. **Scale
-Always On** extends it to the surfaces that ride native UI: unfocused hand
-strips and the End Turn badges. A change to the setup bar's scale must move the
-top panel's stacking shift with it, or the two overlap.
+display, the setup bar, and the "Will trigger:" banner — so the setup bar is 1.5
+out of the box and nothing sharing the top slot is sized differently from its
+neighbour. **Scale Always On** extends it to the surfaces that ride native UI:
+unfocused hand strips and the End Turn badges. A change to the setup bar's scale
+must move the top panel's stacking shift with it, or the two overlap.
 
 "Don't do X" payoffs (Pocketwatch, Art of War, Ripple Basin, Orichalcum) slash a
 card **only while the payoff is still winnable**; once this turn's is already
@@ -111,11 +112,15 @@ Any directional change must be applied across all of these:
   to aqua projected counts and the flip back on cancel, and the in-play absolute
   z that keeps badges above the targeting arrow (relative z on plain hover so
   overlay screens still cover the strip);
-- the "Triggers [icons]" banner (top-center at 20% down the screen; visible only
+- the "Will trigger:" banner (top-center at 20% down the screen; visible only
   while a play in progress will fire a source: primed counters, armed first-X
   sources, active allowances);
 - the setup bar and its stacking with the top panel (both on, either alone,
   and at every slider scale);
+- the two captioned panels — "Setup Relics" and "Will trigger:" — where the
+  caption is a line inside the same backing, so the panel's band has to reserve
+  `BadgeStrip.TitleRowHeight * scale` on top of the icon row or the backing
+  clips it (`PanelHeight` is the single place that arithmetic lives);
 - the badge strip above the End Turn button (active, X-ed out, hidden states; enemy
   turn, when the strip rides the button's slide-out tween);
 - the hover tips on End Turn badges (will / will NOT wording, counts read from the

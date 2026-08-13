@@ -2,7 +2,7 @@
   "title": "Micro Assistant",
   "description": "Shows which counting relics and powers each card play affects - on the hovered card, and above the End Turn button.",
   "visibility": "unlisted",
-  "changeNote": "v0.12.0: optional always-on Setup Relics bar listing the nine run-persistent relics (counters that carry between combats); Scale Always On applies the size slider to every badge surface; don-t-do-X payoffs (Pocketwatch, Art of War, Ripple Basin, Orichalcum) now warn on a card only while the payoff is still winnable.",
+  "changeNote": "v0.13.0: the Setup Relics bar is on by default and captioned \"Setup Relics\"; the banner for what a card play is about to set off is captioned \"Will trigger:\" over its icons. The badge scale slider now starts at 1.5 and sizes the mod's own panels directly - Scale Always On extends it to the End Turn badges and unfocused hand cards.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []

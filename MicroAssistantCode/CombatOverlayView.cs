@@ -81,6 +81,11 @@ internal sealed class CombatOverlayView : IDisposable
     private const float TopPanelAnchorY = 0.2f;
     private const float PanelGap = 6f;
 
+    // The captions on the two panels that share that slot. Neither is a game
+    // string, so neither is localized — the same as this mod's hover-tip bodies.
+    private const string SetupTitle = "Setup Relics";
+    private const string TriggerTitle = "Will trigger:";
+
     private readonly NCombatUi _ui;
     private readonly List<RelicModel> _subscribedRelics = [];
     private readonly Dictionary<NHandCardHolder, HBoxContainer> _handStrips = [];
@@ -332,9 +337,20 @@ internal sealed class CombatOverlayView : IDisposable
         ViewOptions.ScaleAlwaysOn ? ViewOptions.Scale : 1f;
 
     /// <summary>
+    /// The band a backed panel needs: only the icon row and the caption scale — the
+    /// tooltip backing's content insets are fixed — so it is row (+ caption) plus
+    /// insets, never a flat multiple.
+    /// </summary>
+    private static float PanelHeight(float scale, bool titled) =>
+        BadgeRowHeight * scale +
+        (titled ? BadgeStrip.TitleRowHeight * scale : 0f) +
+        BackingInsets;
+
+    /// <summary>
     /// The always-on setup bar: the run-persistent relics, whose counters carry
     /// between combats. It takes the upper slot at the top-panel anchor, and the
-    /// card panel stacks beneath it.
+    /// card panel stacks beneath it. Captioned, because a bare row of relic icons
+    /// at the top of the screen does not explain itself.
     /// </summary>
     private void RefreshSetupPanel()
     {
@@ -345,10 +361,11 @@ internal sealed class CombatOverlayView : IDisposable
                 ? CountingTracker.ForSetup(_player)
                 : [];
         var scale = ViewOptions.Scale;
-        var half = (BadgeRowHeight * scale + BackingInsets) / 2f;
+        var half = PanelHeight(scale, titled: true) / 2f;
         _setupPanel.OffsetTop = -half;
         _setupPanel.OffsetBottom = half;
-        BadgeStrip.SetBadges(_setupPanel, badges, backed: true, scale: scale);
+        BadgeStrip.SetBadges(
+            _setupPanel, badges, backed: true, scale: scale, title: SetupTitle);
         _setupPanel.Visible = badges.Count > 0;
         _setupVisible = badges.Count > 0;
     }
@@ -517,7 +534,7 @@ internal sealed class CombatOverlayView : IDisposable
         var scale = ViewOptions.ScaleAlwaysOn || (active && !ViewOptions.ShowUpTop)
             ? ViewOptions.Scale
             : 1f;
-        var height = BadgeRowHeight * scale + BackingInsets;
+        var height = PanelHeight(scale, titled: false);
         var (top, bottom) = ViewOptions.CardOverlay
             ? (OverlayCenter - height / 2f, OverlayCenter + height / 2f)
             : ViewOptions.ReplaceCardCount
@@ -542,9 +559,11 @@ internal sealed class CombatOverlayView : IDisposable
 
     /// <summary>
     /// The top-center panel: under Show Up Top it carries the active card's full
-    /// badge row (sized by Big &amp; Bold, never showing the card number — that
-    /// context is worthless up there) whenever a card is focused or in play;
-    /// otherwise it shows the icons of what a play in progress will set off.
+    /// badge row (never showing the card number — that context is worthless up
+    /// there) whenever a card is focused or in play; otherwise it is the
+    /// "Will trigger:" banner, the icons of what a play in progress will set off.
+    /// Both take the scale slider, so neither can look out of place beside the
+    /// setup bar sharing the slot.
     /// </summary>
     private void UpdateTopPanel(NHandCardHolder? inPlay)
     {
@@ -557,19 +576,19 @@ internal sealed class CombatOverlayView : IDisposable
             ? active.CardModel
             : null;
 
+        var scale = ViewOptions.Scale;
         if (!ViewOptions.ShowUpTop)
         {
-            SizeTopPanel(1f);
+            SizeTopPanel(scale, titled: true);
             var triggering = card != null && inPlay != null
                 ? CountingTracker.ForCardPlay(card.Owner, card, projected: true)
                     .Where(badge => badge.WillTrigger).ToList()
                 : [];
-            BadgeStrip.SetTriggerIcons(_topPanel, triggering);
+            BadgeStrip.SetTriggerIcons(_topPanel, triggering, scale, TriggerTitle);
             return;
         }
 
-        var scale = ViewOptions.Scale;
-        SizeTopPanel(scale);
+        SizeTopPanel(scale, titled: false);
         var badges = card != null
             ? CountingTracker.ForCardPlay(card.Owner, card, projected: inPlay != null)
             : [];
@@ -577,13 +596,13 @@ internal sealed class CombatOverlayView : IDisposable
         _topPanel.Visible = badges.Count > 0;
     }
 
-    private void SizeTopPanel(float scale)
+    private void SizeTopPanel(float scale, bool titled)
     {
-        var half = (BadgeRowHeight * scale + BackingInsets) / 2f;
+        var half = PanelHeight(scale, titled) / 2f;
         // Stack under the setup bar when it is up, so the two never overlap. The
-        // shift must use the setup bar's own scale, not this panel's.
+        // shift is the setup bar's own height — its scale, and its caption.
         var shift = _setupVisible
-            ? BadgeRowHeight * ViewOptions.Scale + BackingInsets + PanelGap
+            ? PanelHeight(ViewOptions.Scale, titled: true) + PanelGap
             : 0f;
         _topPanel!.OffsetTop = -half + shift;
         _topPanel.OffsetBottom = half + shift;
