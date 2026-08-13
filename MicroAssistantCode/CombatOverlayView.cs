@@ -7,6 +7,8 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
+using MegaCrit.Sts2.Core.Nodes.Screens.Capstones;
+using MegaCrit.Sts2.Core.Nodes.Screens.Map;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.addons.mega_text;
@@ -98,6 +100,11 @@ internal sealed class CombatOverlayView : IDisposable
     private MegaLabel? _faceLabel;
     private Player? _player;
 
+    // Held rather than re-resolved: both resolve through NRun.Instance, which is
+    // already gone by the time this view is disposed on the way out of a run.
+    private NMapScreen? _mapScreen;
+    private NCapstoneContainer? _capstones;
+
     /// <summary>Whether the setup bar is currently taking room above the top panel.</summary>
     private bool _setupVisible;
 
@@ -149,6 +156,21 @@ internal sealed class CombatOverlayView : IDisposable
                 _options.Attach(NRun.Instance.GlobalUi, StatusLine);
         });
 
+        // Opening the map or a card-pile screen moves nothing in CombatManager, so
+        // the covering screens are the only things that can report themselves.
+        Guard.Run("Watching for screens that cover combat", () =>
+        {
+            _mapScreen = NMapScreen.Instance;
+            _capstones = NCapstoneContainer.Instance;
+            if (_mapScreen != null)
+            {
+                _mapScreen.Opened += OnCoveringScreenChanged;
+                _mapScreen.Closed += OnCoveringScreenChanged;
+            }
+            if (_capstones != null)
+                _capstones.Changed += OnCoveringScreenChanged;
+        });
+
         CombatManager.Instance.CombatBegan += OnCombatBegan;
         CombatManager.Instance.CombatEnded += OnCombatEnded;
         CombatManager.Instance.TurnStarted += OnTurnChanged;
@@ -175,6 +197,15 @@ internal sealed class CombatOverlayView : IDisposable
         RunManager.Instance.HoveredModelTracker.HoverChanged -= OnHoverChanged;
         CombatManager.Instance.StateTracker.CombatStateChanged -= OnCombatStateChanged;
         ViewOptions.Changed -= OnOptionsChanged;
+        if (_mapScreen != null && GodotObject.IsInstanceValid(_mapScreen))
+        {
+            _mapScreen.Opened -= OnCoveringScreenChanged;
+            _mapScreen.Closed -= OnCoveringScreenChanged;
+        }
+        if (_capstones != null && GodotObject.IsInstanceValid(_capstones))
+            _capstones.Changed -= OnCoveringScreenChanged;
+        _mapScreen = null;
+        _capstones = null;
         UnbindPlayer();
         RestoreIndexLabels();
         foreach (var strip in _handStrips.Values)
@@ -225,6 +256,14 @@ internal sealed class CombatOverlayView : IDisposable
         Guard.Run("Refreshing badges on combat state change", () =>
         {
             Diag.Once("statechange", () => "Combat state change received.");
+            RefreshEndTurn();
+            SyncHandStrips();
+        });
+
+    /// <summary>The map or a capstone screen opened or closed over the board.</summary>
+    private void OnCoveringScreenChanged() =>
+        Guard.Run("Refreshing badges as a screen opened or closed over combat", () =>
+        {
             RefreshEndTurn();
             SyncHandStrips();
         });
@@ -304,9 +343,10 @@ internal sealed class CombatOverlayView : IDisposable
 
     private void RefreshEndTurn()
     {
-        var badges = _player != null && CombatManager.Instance.IsInProgress
-            ? CountingTracker.ForEndTurn(_player)
-            : [];
+        var badges = _player != null && CombatManager.Instance.IsInProgress &&
+            !BoardCovered()
+                ? CountingTracker.ForEndTurn(_player)
+                : [];
         // "Hide Negated Payoffs": a lost payoff disappears instead of being slashed.
         if (ViewOptions.HideNegatedPayoffs)
             badges = badges.Where(badge => !badge.Broken).ToList();
@@ -337,6 +377,24 @@ internal sealed class CombatOverlayView : IDisposable
         ViewOptions.ScaleAlwaysOn ? ViewOptions.Scale : 1f;
 
     /// <summary>
+    /// Whether a screen is standing in front of the combat board: the map, or a
+    /// capstone screen (All Cards, the draw and discard piles). Mirrors the game's
+    /// own NOverlayStack.StackIsCovered, so this mod's panels stand down exactly
+    /// when the game's own overlays do.
+    ///
+    /// Nothing in CombatManager moves when one of those opens, and the top-slot
+    /// panels carry an absolute z to beat the targeting arrow — which also carries
+    /// them straight through anything drawn over combat. Hence an explicit test
+    /// rather than trusting draw order. A failed check reports "not covered": the
+    /// old overdraw is a better failure than a mod that silently shows nothing.
+    /// </summary>
+    private static bool BoardCovered() => Guard.Run(
+        "Checking whether a screen covers the combat board",
+        () => (NMapScreen.Instance?.IsOpen ?? false) ||
+              (NCapstoneContainer.Instance?.InUse ?? false),
+        false);
+
+    /// <summary>
     /// The band a backed panel needs: only the icon row and the caption scale — the
     /// tooltip backing's content insets are fixed — so it is row (+ caption) plus
     /// insets, never a flat multiple.
@@ -357,7 +415,7 @@ internal sealed class CombatOverlayView : IDisposable
         if (_setupPanel == null || !GodotObject.IsInstanceValid(_setupPanel))
             return;
         var badges = ViewOptions.ShowSetupRelics && _player != null &&
-            CombatManager.Instance.IsInProgress
+            CombatManager.Instance.IsInProgress && !BoardCovered()
                 ? CountingTracker.ForSetup(_player)
                 : [];
         var scale = ViewOptions.Scale;
@@ -479,7 +537,8 @@ internal sealed class CombatOverlayView : IDisposable
     {
         var wanted = new List<NHandCardHolder>();
         NHandCardHolder? inPlay = null;
-        if (CombatManager.Instance.IsInProgress && NPlayerHand.Instance is { } hand)
+        if (CombatManager.Instance.IsInProgress && !BoardCovered() &&
+            NPlayerHand.Instance is { } hand)
         {
             inPlay = InPlayHolder();
             if (ViewOptions.AlwaysOn)
@@ -569,7 +628,7 @@ internal sealed class CombatOverlayView : IDisposable
     {
         if (_topPanel == null || !GodotObject.IsInstanceValid(_topPanel))
             return;
-        var active = inPlay ?? (CombatManager.Instance.IsInProgress
+        var active = inPlay ?? (CombatManager.Instance.IsInProgress && !BoardCovered()
             ? NPlayerHand.Instance?.FocusedHolder
             : null);
         var card = active != null && GodotObject.IsInstanceValid(active)

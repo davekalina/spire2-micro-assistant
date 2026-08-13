@@ -127,6 +127,12 @@ Any directional change must be applied across all of these:
   source's DynamicVars; hand badges must never catch the mouse and get no tips);
 - badge visuals shared by both strips (`BadgeStrip`: icon, count label, and the
   broken mark — the game's own card_unplayable_icon slash roundel, not a glyph);
+- every surface with a screen standing in front of the board — the map, All
+  Cards, the draw and discard piles — where the whole display must stand down
+  and come back on close (`BoardCovered`, mirroring the game's own
+  `NOverlayStack.StackIsCovered`; the top-slot panels' absolute z would
+  otherwise carry them straight through anything drawn over combat, and nothing
+  in `CombatManager` moves when one of those screens opens);
 - combat lifecycle edges: combat start and end, relic gained or lost mid-combat,
   power applied or removed mid-combat, relic melted, instanced powers appearing
   more than once, card played while another card is focused;

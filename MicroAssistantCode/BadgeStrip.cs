@@ -49,11 +49,14 @@ internal static class BadgeStrip
     private const float BannerIconSize = 40f;
 
     // A panel's caption: the same Kreon face as the counts, in the game's gold, on
-    // its own line above the icons and inside the same backing. TitleRowHeight is
-    // the height it reserves at scale 1 — callers sizing a titled panel must add
-    // TitleRowHeight * scale to the band, or the backing clips the icons.
-    private const int TitleFontSize = 20;
-    public const float TitleRowHeight = 28f;
+    // its own line above the icons and inside the same backing. Deliberately well
+    // under the icon row's height — it labels the panel, it is not its headline.
+    // TitleRowHeight is the height it reserves at scale 1; callers sizing a titled
+    // panel must add TitleRowHeight * scale to the band, or the backing clips the
+    // icons.
+    private const int TitleFontSize = 12;
+    private const int TitleOutlineSize = 6;
+    public const float TitleRowHeight = 18f;
 
     // The native tooltip backing: images/ui/hover_tip.png as a nine-patch, with a
     // 25% black copy offset behind it as the shadow, inside a MarginContainer whose
@@ -123,7 +126,8 @@ internal static class BadgeStrip
             AutoSizeEnabled = false,
             CustomMinimumSize = new Vector2(0f, TitleRowHeight * scale),
         };
-        Style(caption, (int)(TitleFontSize * scale), StsColors.gold, (int)(8 * scale));
+        Style(caption, (int)(TitleFontSize * scale), StsColors.gold,
+            (int)(TitleOutlineSize * scale));
         column.AddChild(caption);
         column.AddChild(row);
         return column;

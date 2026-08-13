@@ -2,7 +2,7 @@
   "title": "Micro Assistant",
   "description": "Shows which counting relics and powers each card play affects - on the hovered card, and above the End Turn button.",
   "visibility": "unlisted",
-  "changeNote": "v0.13.0: the Setup Relics bar is on by default and captioned \"Setup Relics\"; the banner for what a card play is about to set off is captioned \"Will trigger:\" over its icons. The badge scale slider now starts at 1.5 and sizes the mod's own panels directly - Scale Always On extends it to the End Turn badges and unfocused hand cards.",
+  "changeNote": "v0.13.1: the panel captions are a caption size instead of a headline size. The badges now stand down while the map, All Cards, or a card pile is open over the combat board, and come back when it closes.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
