@@ -72,15 +72,21 @@ The gear menu's first row is a status line — "Tracking X of N relics, Y of M
 powers" — refreshed each open, so a badge-less run is diagnosable at a glance.
 The experimental view controls (session-only except where noted, behind the
 settings-gear icon left of the version text, `ViewOptions` + `OptionsPanel`):
-a **badge scale slider** (0.5–3.0 in 0.05 steps; replaced the Big & Bold toggle,
-which was scale 2.0) plus eight switches — Replace Card Count defaults ON, it won
-its audition; **Hide Negated Payoffs** drops the slashed will-NOT End Turn
-badges instead of showing them; **Scale Always On** extends the slider from the
-focused card's display to every badge surface; **Setup Relics Bar** shows the
-nine run-persistent relics (Pen Nib, Nunchaku, Tuning Fork, Iron Club, Joss
-Paper, Pendulum, both Happy Flowers, Pollinous Core — the `Persistent` registry
-flag, matching the game's `[SavedProperty]` counters) in the top-panel slot,
-always on while enabled, with the card panel stacking beneath it.
+a **badge scale slider** (0.5–3.0 in 0.05 steps, **defaulting to 1.5**; replaced
+the Big & Bold toggle, which was scale 2.0) plus eight switches — Replace Card
+Count defaults ON, it won its audition; **Hide Negated Payoffs** drops the
+slashed will-NOT End Turn badges instead of showing them; **Setup Relics Bar**
+(**defaults ON**) shows the nine run-persistent relics (Pen Nib, Nunchaku,
+Tuning Fork, Iron Club, Joss Paper, Pendulum, both Happy Flowers, Pollinous Core
+— the `Persistent` registry flag, matching the game's `[SavedProperty]`
+counters) in the top-panel slot, always on while enabled, with the card panel
+stacking beneath it.
+
+The slider governs the mod's **own** panels directly — the focused card's
+display and the setup bar — so the setup bar is 1.5 out of the box. **Scale
+Always On** extends it to the surfaces that ride native UI: unfocused hand
+strips and the End Turn badges. A change to the setup bar's scale must move the
+top panel's stacking shift with it, or the two overlap.
 
 "Don't do X" payoffs (Pocketwatch, Art of War, Ripple Basin, Orichalcum) slash a
 card **only while the payoff is still winnable**; once this turn's is already

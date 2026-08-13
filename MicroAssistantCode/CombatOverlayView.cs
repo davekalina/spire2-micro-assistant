@@ -323,8 +323,10 @@ internal sealed class CombatOverlayView : IDisposable
     }
 
     /// <summary>
-    /// The size for surfaces that are not the focused card's display: 1 unless
-    /// "Scale Always On" extends the slider to everything.
+    /// The size for surfaces that ride native UI — unfocused hand strips and the
+    /// End Turn badges: 1 unless "Scale Always On" extends the slider to them. The
+    /// mod's own panels (the focused card's display, the setup bar) take the
+    /// slider directly.
     /// </summary>
     private static float AmbientScale() =>
         ViewOptions.ScaleAlwaysOn ? ViewOptions.Scale : 1f;
@@ -342,7 +344,7 @@ internal sealed class CombatOverlayView : IDisposable
             CombatManager.Instance.IsInProgress
                 ? CountingTracker.ForSetup(_player)
                 : [];
-        var scale = AmbientScale();
+        var scale = ViewOptions.Scale;
         var half = (BadgeRowHeight * scale + BackingInsets) / 2f;
         _setupPanel.OffsetTop = -half;
         _setupPanel.OffsetBottom = half;
@@ -578,9 +580,10 @@ internal sealed class CombatOverlayView : IDisposable
     private void SizeTopPanel(float scale)
     {
         var half = (BadgeRowHeight * scale + BackingInsets) / 2f;
-        // Stack under the setup bar when it is up, so the two never overlap.
+        // Stack under the setup bar when it is up, so the two never overlap. The
+        // shift must use the setup bar's own scale, not this panel's.
         var shift = _setupVisible
-            ? BadgeRowHeight * AmbientScale() + BackingInsets + PanelGap
+            ? BadgeRowHeight * ViewOptions.Scale + BackingInsets + PanelGap
             : 0f;
         _topPanel!.OffsetTop = -half + shift;
         _topPanel.OffsetBottom = half + shift;

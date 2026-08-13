@@ -8,22 +8,24 @@ namespace MicroAssistant.MicroAssistantCode;
 internal static class ViewOptions
 {
     /// <summary>
-    /// Size multiplier for the focused card's badge display, wherever it is placed
-    /// (the slider that replaced the Big &amp; Bold toggle; that mode was 2.0).
-    /// Slider range 0.5..3.0 in 0.05 steps.
+    /// Size multiplier for the mod's own panels — the focused card's badge display
+    /// wherever it is placed, and the setup bar (the slider that replaced the Big
+    /// &amp; Bold toggle; that mode was 2.0). Slider range 0.5..3.0 in 0.05 steps,
+    /// defaulting to 1.5: at 1.0 the setup bar is legible but not glanceable.
     /// </summary>
-    public static float Scale = 1f;
+    public static float Scale = 1.5f;
 
-    /// <summary>Apply Scale to every badge surface, not just the focused card's
-    /// display — unfocused hand strips, End Turn, and the setup bar too.</summary>
+    /// <summary>Extend Scale to the surfaces that sit on native UI as well —
+    /// unfocused hand strips and the End Turn badges.</summary>
     public static bool ScaleAlwaysOn;
 
     /// <summary>Show the always-on setup bar: the run-persistent relics, whose
-    /// counters carry between combats, with their current counts.</summary>
-    public static bool ShowSetupRelics;
+    /// counters carry between combats, with their current counts. On by
+    /// default.</summary>
+    public static bool ShowSetupRelics = true;
 
     /// <summary>The focused card's badge display moves to the top-center panel
-    /// (sized by BigAndBold, never showing the card number).</summary>
+    /// (sized by Scale, never showing the card number).</summary>
     public static bool ShowUpTop;
 
     /// <summary>Every card in hand carries its badge strip, not just the focused one.</summary>
