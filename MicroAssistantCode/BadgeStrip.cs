@@ -58,6 +58,10 @@ internal static class BadgeStrip
     private const int TitleOutlineSize = 6;
     public const float TitleRowHeight = 18f;
 
+    // A captioned panel is a billboard at the top of the screen, not a badge
+    // cluster pinned to a card, and it reads better with room around a short row.
+    private const float TitledMinWidth = 292f;
+
     // The native tooltip backing: images/ui/hover_tip.png as a nine-patch, with a
     // 25% black copy offset behind it as the shadow, inside a MarginContainer whose
     // content margins match the art's borders. Straight from ui/hover_tip.tscn.
@@ -105,7 +109,9 @@ internal static class BadgeStrip
                 StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
                 MouseFilter = Control.MouseFilterEnum.Ignore,
             });
-        banner.AddChild(BackedPanel(title == null ? icons : Titled(title, icons, scale)));
+        banner.AddChild(title == null
+            ? BackedPanel(icons)
+            : BackedPanel(Titled(title, icons, scale), TitledMinWidth));
     }
 
     /// <summary>
@@ -136,14 +142,16 @@ internal static class BadgeStrip
     /// <summary>
     /// The native tooltip's backing sandwich around some content: shadow and
     /// nine-patch filling a MarginContainer, content inset by the art's borders.
+    /// <paramref name="minWidth" /> raises the floor for panels that should read as
+    /// a billboard rather than hug a short row.
     /// </summary>
-    public static Control BackedPanel(Control content)
+    public static Control BackedPanel(Control content, float minWidth = 0f)
     {
         var panel = new MarginContainer
         {
             MouseFilter = Control.MouseFilterEnum.Ignore,
             // The nine-patch corners need this much room to render undistorted.
-            CustomMinimumSize = new Vector2(146f, 75f),
+            CustomMinimumSize = new Vector2(Math.Max(146f, minWidth), 75f),
         };
         // hover_tip.tscn lets the art overhang the layout box a little.
         panel.AddThemeConstantOverride("margin_right", -8);
@@ -152,7 +160,13 @@ internal static class BadgeStrip
         panel.AddChild(BackingPatch(BackingRegion, Colors.White));
 
         var inset = new MarginContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        inset.AddThemeConstantOverride("margin_left", 22);
+        // hover_tip.tscn's own left inset is 22, against a right of 45 — asymmetric
+        // because the art carries transparent padding down that edge and the native
+        // tip's text is left aligned anyway. Every row here is centered, so the two
+        // sides have to match or the content sits left of the frame it is centered
+        // in: 22 against 45 (less the panel's own -8 overhang) put it 11px off, far
+        // enough to read as a mistake.
+        inset.AddThemeConstantOverride("margin_left", 45);
         inset.AddThemeConstantOverride("margin_top", 16);
         inset.AddThemeConstantOverride("margin_right", 45);
         inset.AddThemeConstantOverride("margin_bottom", 28);
@@ -236,7 +250,9 @@ internal static class BadgeStrip
         foreach (var badge in badges)
             row.AddChild(CreateBadge(badge, scale));
         if (!ReferenceEquals(row, strip))
-            strip.AddChild(BackedPanel(title == null ? row : Titled(title, row, scale)));
+            strip.AddChild(title == null
+                ? BackedPanel(row)
+                : BackedPanel(Titled(title, row, scale), TitledMinWidth));
     }
 
     private static Control CreateBadge(SourceBadge badge, float scale = 1f)

@@ -2,7 +2,7 @@
   "title": "Micro Assistant",
   "description": "Shows which counting relics and powers each card play affects - on the hovered card, and above the End Turn button.",
   "visibility": "unlisted",
-  "changeNote": "v0.13.1: the panel captions are a caption size instead of a headline size. The badges now stand down while the map, All Cards, or a card pile is open over the combat board, and come back when it closes.",
+  "changeNote": "v0.13.2: badge rows now sit on the centre of their frame - the backing's insets were asymmetric, which put every row 11px left of where it looked like it should be. The captioned top panels also carry a wider minimum, so a one-relic Setup Relics bar is still a billboard.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
