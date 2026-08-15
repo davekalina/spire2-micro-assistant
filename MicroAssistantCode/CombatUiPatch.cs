@@ -45,7 +45,6 @@ internal static class CombatUiPatch
             var view = new CombatOverlayView(__instance);
             Views.Add(__instance, view);
             view.Attach();
-            Diag.Once("attach", () => "Combat overlay attached to the combat UI.");
         });
 
     [HarmonyPrefix]
@@ -71,11 +70,7 @@ internal static class CardPlayStartPatch
     [HarmonyPostfix]
     [HarmonyPatch("StartCardPlay")]
     private static void AfterStartCardPlay() =>
-        Guard.Run("Projecting badges as a card enters play", () =>
-        {
-            Diag.Once("cardplay", () => "Card play start observed.");
-            CombatUiPatch.SyncViews();
-        });
+        Guard.Run("Projecting badges as a card enters play", CombatUiPatch.SyncViews);
 }
 
 /// <summary>

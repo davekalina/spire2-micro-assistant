@@ -2,8 +2,12 @@ namespace MicroAssistant.MicroAssistantCode;
 
 /// <summary>
 /// The experimental view switches, toggled live from the combat screen's
-/// upper-right panel. Session-only for now, deliberately: these are options being
-/// auditioned, not yet settings worth persisting.
+/// upper-right panel.
+///
+/// Nothing here is persisted, deliberately: these are options being auditioned,
+/// and the values below are the ones every player — including the one dialling
+/// them in — meets on launch. There is no stored state, so there is nothing a
+/// reset could clear. Persist them only once the defaults have settled.
 /// </summary>
 internal static class ViewOptions
 {

@@ -70,8 +70,16 @@ The layering that must not regress silently:
 
 The gear menu's first row is a status line — "Tracking X of N relics, Y of M
 powers" — refreshed each open, so a badge-less run is diagnosable at a glance.
-The experimental view controls (session-only except where noted, behind the
-settings-gear icon left of the version text, `ViewOptions` + `OptionsPanel`):
+**Nothing this mod shows is persisted.** `ViewOptions` is plain statics — no
+config file, no BaseLib registry, no player prefs — so every launch starts at
+the defaults in that class and there is no stored state a "reset" could clear.
+That is deliberate while the defaults are still being dialled in: the defaults
+*are* the product, and each launch is an honest test of them. Persisting the
+switches is the point at which BaseLib's config registry would earn its
+dependency, and it should not happen before the defaults settle.
+
+The experimental view controls (behind the settings-gear icon left of the
+version text, `ViewOptions` + `OptionsPanel`):
 a **badge scale slider** (0.5–3.0 in 0.05 steps, **defaulting to 1.5**; replaced
 the Big & Bold toggle, which was scale 2.0) plus eight switches — Replace Card
 Count defaults ON, it won its audition; **Hide Negated Payoffs** drops the
