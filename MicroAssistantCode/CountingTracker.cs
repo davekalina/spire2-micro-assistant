@@ -3,6 +3,7 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Relics;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Models.Relics;
 
@@ -442,6 +443,20 @@ internal static class CountingTracker
             NextCount: (power, _) =>
                 CountingRules.NextDown(power.DisplayAmount).ToString()),
 
+        // Feel No Pain grants Block for every card exhausted, so the reminder has to
+        // cover both halves: a card that exhausts itself on play, and a card whose
+        // own effect exhausts others. The badge carries the Block per exhaust.
+        [typeof(FeelNoPainPower)] = new(
+            PlayEffect: (_, _, card) => CountingRules.TickerPlay(
+                card.Keywords.Contains(CardKeyword.Exhaust) || ExhaustsOtherCards(card)),
+            EndTurn: (_, _) => EndTurnState.Hidden,
+            CountText: (power, _) => power.Amount.ToString(),
+            Primed: (_, _) => false,
+            EndTurnTip: (_, _, _) => null,
+            // Every exhaust pays out, so a contributing card is always a trigger —
+            // there is no Nth-play threshold to wait for.
+            TriggersWhileContributing: true),
+
         // Plating grants its stacks as Block when the turn ends, then decays; the
         // End Turn badge is the reminder, carrying the amount about to be granted.
         [typeof(PlatingPower)] = new(
@@ -686,6 +701,25 @@ internal static class CountingTracker
     private static bool AnyEnemyVulnerable(RelicModel relic) =>
         relic.Owner.Creature.CombatState?.HittableEnemies
             .Any(enemy => enemy.HasPower<VulnerablePower>()) ?? false;
+
+    /// <summary>
+    /// Cards whose own effect exhausts other cards. There is no keyword or tag for
+    /// this — <see cref="CardKeyword.Exhaust" /> only means "exhausts itself" — and
+    /// the game decides it inside each card's effects, so the set is written out:
+    /// the card models that call <c>CardCmd.Exhaust</c>, as of game 0.111.0. Types
+    /// rather than ids on purpose, so a card that leaves the game breaks the build
+    /// here instead of quietly dropping out of the reminder. A new card that
+    /// exhausts others has to be added here by hand.
+    /// </summary>
+    private static readonly HashSet<Type> ExhaustingCards =
+    [
+        typeof(Brand), typeof(BurningPact), typeof(Cinder), typeof(Cleanse),
+        typeof(FiendFire), typeof(FlakCannon), typeof(Purity), typeof(Scavenge),
+        typeof(SecondWind), typeof(Stoke), typeof(Thrash), typeof(TrueGrit),
+    ];
+
+    private static bool ExhaustsOtherCards(CardModel card) =>
+        ExhaustingCards.Contains(card.GetType());
 
     private static int Energy(RelicModel relic) =>
         relic.Owner.PlayerCombatState?.Energy ?? 0;

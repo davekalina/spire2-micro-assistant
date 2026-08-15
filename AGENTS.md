@@ -41,11 +41,21 @@ and three contextual reminders — Cloak Clasp (End Turn badge carrying the bloc
 it is about to grant), Paper Phrog (attacks while any enemy is Vulnerable),
 Intimidating Helmet (cards currently costing 2+ energy);
 powers — Echo Form, Void Form, Nostalgia,
-Unmovable, Lethality, Phantom Blades, Juggling, Pale Blue Dot, Panache, and
-Plating (End Turn badge carrying the Block about to be granted).
+Unmovable, Lethality, Phantom Blades, Juggling, Pale Blue Dot, Panache,
+Plating (End Turn badge carrying the Block about to be granted), and Feel No
+Pain (badge on anything that exhausts, carrying the Block per exhaust).
 Deliberately excluded: Unsettling Lamp (a card's "applies a debuff to an enemy" is
 only decidable at play time), locks and end-turn reversals (the game communicates
 them), Make It So / Normality / FTL.
+
+**`ExhaustingCards` is the one hand-maintained card list in this mod.** Exhaust
+the *keyword* only ever means "this card exhausts itself"; a card that exhausts
+*other* cards decides that inside its own effects, with no keyword or tag to
+test, so `CountingTracker.ExhaustingCards` names the card models that call
+`CardCmd.Exhaust`. It is the one thing here that a game update can silently make
+wrong — a new exhausting card just will not be reminded about. Re-derive it with
+`grep -rl "CardCmd.Exhaust" decompiled/sts2/MegaCrit/sts2/Core/Models/Cards/`
+when checking the mod against a new game version.
 
 The layering that must not regress silently:
 
