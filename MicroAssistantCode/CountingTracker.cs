@@ -132,6 +132,22 @@ internal static class CountingTracker
                     ? $"Will gain {IntVar(relic, "Block")} Block when this turn ends."
                     : "Will NOT gain Block this turn.")),
 
+        // Pael's Tears: ending the turn with energy to spare earns energy at the
+        // start of the next one. The card worth warning about is the one that would
+        // spend the last of it — for an X-cost card that is any card, since
+        // GetAmountToSpend reports the whole pool for those.
+        [typeof(PaelsTears)] = new(
+            PlayEffect: (relic, card) => CountingRules.TearsPlay(
+                card.EnergyCost.GetAmountToSpend(), Energy(relic)),
+            EndTurn: relic => CountingRules.TearsEndTurn(Energy(relic)),
+            CountText: relic => IntVar(relic, "Energy").ToString(),
+            Primed: _ => false,
+            EndTurnTip: (relic, state) => new BadgeTip(
+                Title(relic),
+                state == EndTurnState.Active
+                    ? $"Will gain {IntVar(relic, "Energy")} energy next turn."
+                    : "Will NOT gain energy next turn.")),
+
         // Pael's Eye: a zero-card turn exhausts the hand and grants an extra turn,
         // once per combat. Its Status is Active exactly while that is still live.
         [typeof(PaelsEye)] = new(
@@ -670,6 +686,9 @@ internal static class CountingTracker
     private static bool AnyEnemyVulnerable(RelicModel relic) =>
         relic.Owner.Creature.CombatState?.HittableEnemies
             .Any(enemy => enemy.HasPower<VulnerablePower>()) ?? false;
+
+    private static int Energy(RelicModel relic) =>
+        relic.Owner.PlayerCombatState?.Energy ?? 0;
 
     private static int IntVar(RelicModel relic, string key) =>
         relic.DynamicVars[key].IntValue;

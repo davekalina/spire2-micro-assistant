@@ -96,6 +96,29 @@ public class CountingRulesTests
     public void Avoidance_end_turn(bool intact, EndTurnState expected) =>
         Assert.Equal(expected, CountingRules.AvoidanceEndTurn(intact));
 
+    // Pael's Tears: the card that would take the last energy is the one to warn
+    // about. Equality matters — a 2-cost with 2 left empties the pool.
+    [Theory]
+    [InlineData(0, 3, CardPlayEffect.None)]
+    [InlineData(2, 3, CardPlayEffect.None)]
+    [InlineData(3, 3, CardPlayEffect.Breaks)]
+    [InlineData(4, 3, CardPlayEffect.Breaks)]
+    // An X-cost card reports the whole remaining pool as its cost, so it lands on
+    // the equality case whatever the pool happens to be.
+    [InlineData(1, 1, CardPlayEffect.Breaks)]
+    // Already at zero: the payoff is spent, so nothing is left to warn about.
+    [InlineData(0, 0, CardPlayEffect.None)]
+    [InlineData(2, 0, CardPlayEffect.None)]
+    public void Tears_play(int cost, int energy, CardPlayEffect expected) =>
+        Assert.Equal(expected, CountingRules.TearsPlay(cost, energy));
+
+    [Theory]
+    [InlineData(1, EndTurnState.Active)]
+    [InlineData(5, EndTurnState.Active)]
+    [InlineData(0, EndTurnState.Broken)]
+    public void Tears_end_turn(int energy, EndTurnState expected) =>
+        Assert.Equal(expected, CountingRules.TearsEndTurn(energy));
+
     // Pael's Eye speaks only while the zero-card turn is still achievable.
     [Theory]
     [InlineData(true, CardPlayEffect.Breaks, EndTurnState.Active)]

@@ -97,6 +97,20 @@ public static class CountingRules
         conditionIntact ? EndTurnState.Active : EndTurnState.Broken;
 
     /// <summary>
+    /// Pael's Tears pays out at the start of next turn if this turn ends with
+    /// energy unspent, so the card to warn about is the one that would take the
+    /// last of it — cost at or above what is left. An X-cost card always qualifies,
+    /// because the game reports the whole remaining pool as its cost. At zero
+    /// energy the payoff is already gone and every card would qualify, which is
+    /// exactly when the other "don't do X" payoffs fall silent too.
+    /// </summary>
+    public static CardPlayEffect TearsPlay(int energyCost, int currentEnergy) =>
+        AvoidancePlay(energyCost >= currentEnergy, payoffIntact: currentEnergy > 0);
+
+    public static EndTurnState TearsEndTurn(int currentEnergy) =>
+        AvoidanceEndTurn(currentEnergy > 0);
+
+    /// <summary>
     /// Pael's Eye: any play breaks it, but it is once per combat and retryable next
     /// turn, so it only speaks while the zero-card turn is still achievable.
     /// </summary>

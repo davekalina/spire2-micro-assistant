@@ -33,7 +33,7 @@ is about to do, on two surfaces during combat:
 Covered sources (one registry entry each in `CountingTracker`): relics —
 Pocketwatch, Pendulum, Pen Nib, Nunchaku, Kunai, Shuriken, Ornamental Fan,
 Kusarigama, Letter Opener, Tuning Fork, Iron Club, Brilliant Scarf, Velvet Choker,
-Art of War, Ripple Basin, Pael's Eye, Rainbow Ring, Happy Flower, Fake Happy
+Art of War, Ripple Basin, Pael's Tears, Pael's Eye, Rainbow Ring, Happy Flower, Fake Happy
 Flower, Pollinous Core, Stone Calendar, Music Box, Vambrace, Permafrost, Pael's
 Legion, Orichalcum, Fake Orichalcum, Joss Paper (Exhaust cards advance it;
 Ethereal cards carry the badge as a reminder without advancing or projecting),

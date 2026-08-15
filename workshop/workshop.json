@@ -2,7 +2,7 @@
   "title": "Micro Assistant",
   "description": "Shows which counting relics and powers each card play affects - on the hovered card, and above the End Turn button.",
   "visibility": "unlisted",
-  "changeNote": "v0.13.2 and v0.13.3: badge rows now sit on the centre of their frame - the backing's insets were asymmetric, which put every row 11px left of where it looked like it should be. The captioned top panels carry a wider minimum, so a one-relic Setup Relics bar is still a billboard. The development log breadcrumbs are gone; the mod is silent unless something fails.",
+  "changeNote": "v0.14.0: Pael's Tears is tracked - an End Turn badge while you still have energy to carry over, and a slash on the card that would spend the last of it.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
