@@ -9,6 +9,7 @@ using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.Screens.Capstones;
 using MegaCrit.Sts2.Core.Nodes.Screens.Map;
+using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.addons.mega_text;
@@ -23,9 +24,9 @@ namespace MicroAssistant.MicroAssistantCode;
 ///
 /// Everything is event-driven off the same signals the native UI repaints on —
 /// relic DisplayAmountChanged/StatusChanged for counts, HoveredModelTracker for the
-/// focused card (which both mouse hover and controller focus feed), CombatManager
-/// for lifecycle, the coalesced CombatStateChanged as the catch-all. No polling,
-/// no per-frame work.
+/// focused card (which both mouse hover and controller focus feed), modal-surface
+/// signals for visibility, CombatManager for lifecycle, and the coalesced
+/// CombatStateChanged as the catch-all. No polling, no per-frame work.
 /// </summary>
 internal sealed class CombatOverlayView : IDisposable
 {
@@ -104,6 +105,8 @@ internal sealed class CombatOverlayView : IDisposable
     // already gone by the time this view is disposed on the way out of a run.
     private NMapScreen? _mapScreen;
     private NCapstoneContainer? _capstones;
+    private NOverlayStack? _overlays;
+    private NPlayerHand? _hand;
 
     /// <summary>Whether the setup bar is currently taking room above the top panel.</summary>
     private bool _setupVisible;
@@ -156,19 +159,25 @@ internal sealed class CombatOverlayView : IDisposable
                 _options.Attach(NRun.Instance.GlobalUi, StatusLine);
         });
 
-        // Opening the map or a card-pile screen moves nothing in CombatManager, so
-        // the covering screens are the only things that can report themselves.
-        Guard.Run("Watching for screens that cover combat", () =>
+        // Opening a covering screen or entering an in-hand selection moves nothing
+        // in CombatManager, so those native surfaces report themselves directly.
+        Guard.Run("Watching for modal surfaces over combat", () =>
         {
             _mapScreen = NMapScreen.Instance;
             _capstones = NCapstoneContainer.Instance;
+            _overlays = NOverlayStack.Instance;
+            _hand = _ui.Hand;
             if (_mapScreen != null)
             {
-                _mapScreen.Opened += OnCoveringScreenChanged;
-                _mapScreen.Closed += OnCoveringScreenChanged;
+                _mapScreen.Opened += OnModalSurfaceChanged;
+                _mapScreen.Closed += OnModalSurfaceChanged;
             }
             if (_capstones != null)
-                _capstones.Changed += OnCoveringScreenChanged;
+                _capstones.Changed += OnModalSurfaceChanged;
+            if (_overlays != null)
+                _overlays.Changed += OnModalSurfaceChanged;
+            if (_hand != null)
+                _hand.ModeChanged += OnModalSurfaceChanged;
         });
 
         CombatManager.Instance.CombatBegan += OnCombatBegan;
@@ -199,13 +208,19 @@ internal sealed class CombatOverlayView : IDisposable
         ViewOptions.Changed -= OnOptionsChanged;
         if (_mapScreen != null && GodotObject.IsInstanceValid(_mapScreen))
         {
-            _mapScreen.Opened -= OnCoveringScreenChanged;
-            _mapScreen.Closed -= OnCoveringScreenChanged;
+            _mapScreen.Opened -= OnModalSurfaceChanged;
+            _mapScreen.Closed -= OnModalSurfaceChanged;
         }
         if (_capstones != null && GodotObject.IsInstanceValid(_capstones))
-            _capstones.Changed -= OnCoveringScreenChanged;
+            _capstones.Changed -= OnModalSurfaceChanged;
+        if (_overlays != null && GodotObject.IsInstanceValid(_overlays))
+            _overlays.Changed -= OnModalSurfaceChanged;
+        if (_hand != null && GodotObject.IsInstanceValid(_hand))
+            _hand.ModeChanged -= OnModalSurfaceChanged;
         _mapScreen = null;
         _capstones = null;
+        _overlays = null;
+        _hand = null;
         UnbindPlayer();
         RestoreIndexLabels();
         foreach (var strip in _handStrips.Values)
@@ -255,9 +270,9 @@ internal sealed class CombatOverlayView : IDisposable
             SyncHandStrips();
         });
 
-    /// <summary>The map or a capstone screen opened or closed over the board.</summary>
-    private void OnCoveringScreenChanged() =>
-        Guard.Run("Refreshing badges as a screen opened or closed over combat", () =>
+    /// <summary>A screen or in-hand card-selection prompt entered or left.</summary>
+    private void OnModalSurfaceChanged() =>
+        Guard.Run("Refreshing badges as a modal surface changed over combat", () =>
         {
             RefreshEndTurn();
             SyncHandStrips();
@@ -335,7 +350,7 @@ internal sealed class CombatOverlayView : IDisposable
     private void RefreshEndTurn()
     {
         var badges = _player != null && CombatManager.Instance.IsInProgress &&
-            !BoardCovered()
+            !ShouldStandDown()
                 ? CountingTracker.ForEndTurn(_player)
                 : [];
         // "Hide Negated Payoffs": a lost payoff disappears instead of being slashed.
@@ -365,10 +380,9 @@ internal sealed class CombatOverlayView : IDisposable
         ViewOptions.ScaleAlwaysOn ? ViewOptions.Scale : 1f;
 
     /// <summary>
-    /// Whether a screen is standing in front of the combat board: the map, or a
-    /// capstone screen (All Cards, the draw and discard piles). Mirrors the game's
-    /// own NOverlayStack.StackIsCovered, so this mod's panels stand down exactly
-    /// when the game's own overlays do.
+    /// Whether the mod should stand down for a modal game surface: the map, a
+    /// capstone screen (All Cards, the draw and discard piles), an overlay-stack
+    /// screen, or an in-hand card-selection prompt such as Tyranny's exhaust.
     ///
     /// Nothing in CombatManager moves when one of those opens, and the top-slot
     /// panels carry an absolute z to beat the targeting arrow — which also carries
@@ -376,10 +390,13 @@ internal sealed class CombatOverlayView : IDisposable
     /// rather than trusting draw order. A failed check reports "not covered": the
     /// old overdraw is a better failure than a mod that silently shows nothing.
     /// </summary>
-    private static bool BoardCovered() => Guard.Run(
-        "Checking whether a screen covers the combat board",
-        () => (NMapScreen.Instance?.IsOpen ?? false) ||
-              (NCapstoneContainer.Instance?.InUse ?? false),
+    private static bool ShouldStandDown() => Guard.Run(
+        "Checking whether the combat display should stand down",
+        () => OverlayVisibilityRules.ShouldStandDown(
+            NMapScreen.Instance?.IsOpen ?? false,
+            NCapstoneContainer.Instance?.InUse ?? false,
+            (NOverlayStack.Instance?.ScreenCount ?? 0) > 0,
+            NPlayerHand.Instance?.IsInCardSelection ?? false),
         false);
 
     /// <summary>
@@ -403,7 +420,7 @@ internal sealed class CombatOverlayView : IDisposable
         if (_setupPanel == null || !GodotObject.IsInstanceValid(_setupPanel))
             return;
         var badges = ViewOptions.ShowSetupRelics && _player != null &&
-            CombatManager.Instance.IsInProgress && !BoardCovered()
+            CombatManager.Instance.IsInProgress && !ShouldStandDown()
                 ? CountingTracker.ForSetup(_player)
                 : [];
         var scale = ViewOptions.Scale;
@@ -525,7 +542,7 @@ internal sealed class CombatOverlayView : IDisposable
     {
         var wanted = new List<NHandCardHolder>();
         NHandCardHolder? inPlay = null;
-        if (CombatManager.Instance.IsInProgress && !BoardCovered() &&
+        if (CombatManager.Instance.IsInProgress && !ShouldStandDown() &&
             NPlayerHand.Instance is { } hand)
         {
             inPlay = InPlayHolder();
@@ -613,7 +630,7 @@ internal sealed class CombatOverlayView : IDisposable
     {
         if (_topPanel == null || !GodotObject.IsInstanceValid(_topPanel))
             return;
-        var active = inPlay ?? (CombatManager.Instance.IsInProgress && !BoardCovered()
+        var active = inPlay ?? (CombatManager.Instance.IsInProgress && !ShouldStandDown()
             ? NPlayerHand.Instance?.FocusedHolder
             : null);
         var card = active != null && GodotObject.IsInstanceValid(active)
