@@ -2,7 +2,7 @@
   "title": "Micro Assistant",
   "description": "Shows which counting relics and powers each card play affects - on the hovered card, and above the End Turn button.",
   "visibility": "unlisted",
-  "changeNote": "v0.14.0 and v0.15.0: Pael's Tears is tracked - an End Turn badge while you still have energy to carry over, and a slash on the card that would spend the last of it. Feel No Pain is tracked too, badging both the cards that exhaust themselves and the ones that exhaust other cards, with the Block per exhaust on the badge.",
+  "changeNote": "v0.15.1: The Setup Relics bar now hides during Tyranny and other card-selection prompts, then returns when the choice is complete.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
