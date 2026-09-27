@@ -29,10 +29,10 @@ internal static class ViewOptions
     /// default.</summary>
     public static bool ShowSetupRelics = true;
 
-    /// <summary>Anchor the setup bar in the upper left, just under the relic bar
-    /// (however many rows it wraps to), instead of the top-center slot it shares
-    /// with the "Will trigger:" banner. On by default.</summary>
-    public static bool SetupTopLeft = true;
+    /// <summary>Anchor the setup bar in the upper left, just under the relic bar,
+    /// instead of centered at the top (both hang from the relic bar's last row,
+    /// however many rows it wraps to). Off by default: top-center is home.</summary>
+    public static bool SetupTopLeft;
 
     /// <summary>Show the Block that ending the turn would grant — Orichalcum,
     /// Cloak Clasp, Plating, Frost orbs, ... — as a "+N" shield just left of the

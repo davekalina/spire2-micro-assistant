@@ -20,8 +20,9 @@ internal enum ReadoutStyle
 /// <summary>
 /// The card readout and the setup bar, built to the "Micro Assistant Final" design
 /// (Claude Design, spire-mod design system). Every number below is that spec at
-/// 1920x1080 and scale 1; the scale slider multiplies all of them together, so a
-/// panel keeps its proportions at any size.
+/// 1920x1080 and scale 1, except the centered dock, which takes the left band's
+/// sizes; the scale slider multiplies all of them together, so a panel keeps its
+/// proportions at any size.
 ///
 /// The plate is the design system's popup surface: a square, near-opaque slate
 /// band with a steel hairline and a deep drop shadow. Counts are Kreon bold in
@@ -74,10 +75,10 @@ internal static class Readout
         BadgeBottom: -5f, PadLeft: 22f, PadTop: 10f, PadRight: 22f, PadBottom: 12f,
         LabelFontSize: 20, LabelGap: 20f);
 
-    private static readonly Metrics DockMetrics = new(
-        Icon: 40f, Gap: 18f, FontSize: 18, BadgeRight: -6f, BadgeRightWide: -8f,
-        BadgeBottom: -5f, PadLeft: 12f, PadTop: 7f, PadRight: 18f, PadBottom: 9f,
-        LabelFontSize: 17, LabelGap: 16f);
+    // The dock keeps its own look (fade, gold rule, no divider) but takes the band's
+    // sizes: the design's dock numbers (40px icons, 17pt label, 7/9 padding) read
+    // too small in game, and the two placements should be the same size.
+    private static readonly Metrics DockMetrics = BandMetrics;
 
     private static Metrics For(ReadoutStyle style) => style switch
     {
