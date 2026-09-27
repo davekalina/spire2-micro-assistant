@@ -7,6 +7,8 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Combat;
+using MegaCrit.Sts2.Core.Nodes.Relics;
+using MegaCrit.Sts2.Core.Nodes.Rooms;
 using MegaCrit.Sts2.Core.Nodes.Screens.Capstones;
 using MegaCrit.Sts2.Core.Nodes.Screens.Map;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
@@ -84,6 +86,21 @@ internal sealed class CombatOverlayView : IDisposable
     private const float TopPanelAnchorY = 0.2f;
     private const float PanelGap = 6f;
 
+    // Setup Relics Top Left: the setup bar's top-left corner sits this far under
+    // the relic bar's last row, at the bar's own left edge.
+    private const float SetupUnderRelicBarGap = 4f;
+
+    // The pending-Block shield copies the native %BlockContainer (60x60, block.png,
+    // a 24pt Kreon label inset 10/-5/-9/11) and sits just left of it, overlapping
+    // by a sliver so the pair reads as one cluster. Translucent, with an aqua
+    // count: this mod's color for a value that is about to be, not one that is.
+    private const string BlockTexturePath = "res://images/ui/combat/block.png";
+    private const string BlockFontPath = "res://themes/kreon_bold_glyph_space_one.tres";
+    private static readonly Vector2 PendingBlockSize = new(60f, 60f);
+    private const float PendingBlockOverlap = 6f;
+    private static readonly Color PendingBlockIconModulate = new(1f, 1f, 1f, 0.6f);
+    private static readonly Color BlockLabelOutline = new(0.042f, 0.3318f, 0.42f);
+
     // The captions on the two panels that share that slot. Neither is a game
     // string, so neither is localized — the same as this mod's hover-tip bodies.
     private const string SetupTitle = "Setup Relics";
@@ -99,6 +116,8 @@ internal sealed class CombatOverlayView : IDisposable
     private HBoxContainer? _topPanel;
     private HBoxContainer? _setupPanel;
     private MegaLabel? _faceLabel;
+    private Control? _pendingBlock;
+    private MegaLabel? _pendingBlockLabel;
     private Player? _player;
 
     // Held rather than re-resolved: both resolve through NRun.Instance, which is
@@ -107,6 +126,7 @@ internal sealed class CombatOverlayView : IDisposable
     private NCapstoneContainer? _capstones;
     private NOverlayStack? _overlays;
     private NPlayerHand? _hand;
+    private NRelicInventory? _relicInventory;
 
     /// <summary>Whether the setup bar is currently taking room above the top panel.</summary>
     private bool _setupVisible;
@@ -180,6 +200,16 @@ internal sealed class CombatOverlayView : IDisposable
                 _hand.ModeChanged += OnModalSurfaceChanged;
         });
 
+        // The top-left setup bar follows the relic bar. Its container re-sorts
+        // whenever a relic joins or leaves or the screen resizes, and its line
+        // count is only settled once that sort has run.
+        Guard.Run("Following the relic bar's layout", () =>
+        {
+            _relicInventory = NRun.Instance?.GlobalUi?.RelicInventory;
+            if (_relicInventory != null)
+                _relicInventory.SortChildren += OnRelicBarLaidOut;
+        });
+
         CombatManager.Instance.CombatBegan += OnCombatBegan;
         CombatManager.Instance.CombatEnded += OnCombatEnded;
         CombatManager.Instance.TurnStarted += OnTurnChanged;
@@ -217,10 +247,13 @@ internal sealed class CombatOverlayView : IDisposable
             _overlays.Changed -= OnModalSurfaceChanged;
         if (_hand != null && GodotObject.IsInstanceValid(_hand))
             _hand.ModeChanged -= OnModalSurfaceChanged;
+        if (_relicInventory != null && GodotObject.IsInstanceValid(_relicInventory))
+            _relicInventory.SortChildren -= OnRelicBarLaidOut;
         _mapScreen = null;
         _capstones = null;
         _overlays = null;
         _hand = null;
+        _relicInventory = null;
         UnbindPlayer();
         RestoreIndexLabels();
         foreach (var strip in _handStrips.Values)
@@ -240,6 +273,7 @@ internal sealed class CombatOverlayView : IDisposable
         FreeStrip(ref _endTurnExtension);
         FreeStrip(ref _topPanel);
         FreeStrip(ref _setupPanel);
+        FreePendingBlock();
         _options.Dispose();
     }
 
@@ -277,6 +311,9 @@ internal sealed class CombatOverlayView : IDisposable
             RefreshEndTurn();
             SyncHandStrips();
         });
+
+    private void OnRelicBarLaidOut() =>
+        Guard.Run("Moving the setup bar with the relic bar", PlaceSetupPanel);
 
     private void OnOptionsChanged() =>
         Guard.Run("Applying changed view options", () =>
@@ -368,6 +405,7 @@ internal sealed class CombatOverlayView : IDisposable
         }
         RefreshEndTurnFace(badges, scale);
         RefreshSetupPanel();
+        RefreshPendingBlock();
     }
 
     /// <summary>
@@ -411,9 +449,9 @@ internal sealed class CombatOverlayView : IDisposable
 
     /// <summary>
     /// The always-on setup bar: the run-persistent relics, whose counters carry
-    /// between combats. It takes the upper slot at the top-panel anchor, and the
-    /// card panel stacks beneath it. Captioned, because a bare row of relic icons
-    /// at the top of the screen does not explain itself.
+    /// between combats. PlaceSetupPanel puts it in the upper slot at the top-panel
+    /// anchor, with the card panel stacking beneath it, or under the relic bar.
+    /// Captioned, because a bare row of relic icons does not explain itself.
     /// </summary>
     private void RefreshSetupPanel()
     {
@@ -423,14 +461,172 @@ internal sealed class CombatOverlayView : IDisposable
             CombatManager.Instance.IsInProgress && !ShouldStandDown()
                 ? CountingTracker.ForSetup(_player)
                 : [];
-        var scale = ViewOptions.Scale;
-        var half = PanelHeight(scale, titled: true) / 2f;
-        _setupPanel.OffsetTop = -half;
-        _setupPanel.OffsetBottom = half;
+        PlaceSetupPanel();
         BadgeStrip.SetBadges(
-            _setupPanel, badges, backed: true, scale: scale, title: SetupTitle);
+            _setupPanel, badges, backed: true, scale: ViewOptions.Scale, title: SetupTitle);
         _setupPanel.Visible = badges.Count > 0;
-        _setupVisible = badges.Count > 0;
+        // Only the centered bar takes room from the card panel's slot.
+        _setupVisible = badges.Count > 0 && !ViewOptions.SetupTopLeft;
+    }
+
+    /// <summary>
+    /// Where the setup bar sits. Centered, it spans the screen at the top-panel
+    /// anchor with the absolute z the shared slot needs over the targeting arrow.
+    /// Top left, it hangs from the bottom of the relic bar at relative z, so the
+    /// relic bar's own hover tips still draw over it, and grows right and down
+    /// from that corner to fit its content.
+    /// </summary>
+    private void PlaceSetupPanel()
+    {
+        if (_setupPanel == null || !GodotObject.IsInstanceValid(_setupPanel))
+            return;
+        var height = PanelHeight(ViewOptions.Scale, titled: true);
+        if (ViewOptions.SetupTopLeft && UnderRelicBar() is { } corner)
+        {
+            _setupPanel.Alignment = BoxContainer.AlignmentMode.Begin;
+            _setupPanel.AnchorLeft = 0f;
+            _setupPanel.AnchorRight = 0f;
+            _setupPanel.AnchorTop = 0f;
+            _setupPanel.AnchorBottom = 0f;
+            _setupPanel.OffsetLeft = corner.X;
+            _setupPanel.OffsetRight = corner.X;
+            _setupPanel.OffsetTop = corner.Y;
+            _setupPanel.OffsetBottom = corner.Y + height;
+            _setupPanel.ZAsRelative = true;
+            _setupPanel.ZIndex = 0;
+            return;
+        }
+        _setupPanel.Alignment = BoxContainer.AlignmentMode.Center;
+        _setupPanel.AnchorLeft = 0f;
+        _setupPanel.AnchorRight = 1f;
+        _setupPanel.AnchorTop = TopPanelAnchorY;
+        _setupPanel.AnchorBottom = TopPanelAnchorY;
+        _setupPanel.OffsetLeft = 0f;
+        _setupPanel.OffsetRight = 0f;
+        _setupPanel.OffsetTop = -height / 2f;
+        _setupPanel.OffsetBottom = height / 2f;
+        _setupPanel.ZAsRelative = false;
+        _setupPanel.ZIndex = InPlayZ;
+    }
+
+    /// <summary>
+    /// The point just under the relic bar's last row, in the combat UI's space. The
+    /// bar's own GetBottomOfInventory counts its wrapped lines; it is what the
+    /// game's co-op player list hangs from, and in co-op that list is already
+    /// there, so the setup bar goes below it. Null when there is no relic bar.
+    /// </summary>
+    private Vector2? UnderRelicBar()
+    {
+        if (_relicInventory == null || !GodotObject.IsInstanceValid(_relicInventory) ||
+            _relicInventory.GetParent() is not Control parent)
+            return null;
+        var bottom = parent.GetGlobalTransform() * _relicInventory.GetBottomOfInventory();
+        var players = NRun.Instance?.GlobalUi?.MultiplayerPlayerContainer;
+        if (players != null && GodotObject.IsInstanceValid(players) && players.Visible)
+            foreach (var child in players.GetChildren())
+                if (child is Control { Visible: true } row)
+                    bottom.Y = Math.Max(bottom.Y, row.GetGlobalRect().End.Y);
+        bottom.Y += SetupUnderRelicBarGap;
+        return _ui.GetGlobalTransform().AffineInverse() * bottom;
+    }
+
+    /// <summary>
+    /// The pending-Block shield: what ending the turn now would add to the player's
+    /// Block, as "+N" beside the native Block shield. Only during the player's own
+    /// play phase; once End Turn is pressed the real Block is arriving. Parented to
+    /// the player's health bar, so it rides the creature and hides with the bar.
+    /// </summary>
+    private void RefreshPendingBlock()
+    {
+        var amount = ViewOptions.ShowPendingBlock && _player != null &&
+            CombatManager.Instance.IsInProgress && !ShouldStandDown() &&
+            _player.PlayerCombatState?.Phase == PlayerTurnPhase.Play
+                ? CountingTracker.PendingEndTurnBlock(_player)
+                : 0;
+        var healthBar = amount > 0 ? PlayerHealthBar() : null;
+        var native = healthBar?.GetNodeOrNull<Control>("%BlockContainer");
+        if (healthBar == null || native == null)
+        {
+            if (_pendingBlock != null && GodotObject.IsInstanceValid(_pendingBlock))
+                _pendingBlock.Visible = false;
+            return;
+        }
+
+        if (_pendingBlock == null || !GodotObject.IsInstanceValid(_pendingBlock) ||
+            _pendingBlock.GetParent() != healthBar)
+        {
+            FreePendingBlock();
+            CreatePendingBlock();
+            healthBar.AddChild(_pendingBlock);
+        }
+        // The native shield's resting spot, not its live position: it slides in
+        // from 20px up when Block first appears, and this must not follow the tween.
+        var rest = healthBar.Get("_originalBlockPosition");
+        var home = rest.VariantType == Variant.Type.Vector2 ? rest.AsVector2() : native.Position;
+        _pendingBlock!.Position = home - new Vector2(PendingBlockSize.X - PendingBlockOverlap, 0f);
+        _pendingBlock.Size = PendingBlockSize;
+        _pendingBlockLabel!.SetTextAutoSize($"+{amount}");
+        _pendingBlock.Visible = true;
+    }
+
+    private void CreatePendingBlock()
+    {
+        _pendingBlock = new Control
+        {
+            Name = "MicroAssistantPendingBlock",
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        };
+        _pendingBlock.AddChild(new TextureRect
+        {
+            Texture = ResourceLoader.Load<Texture2D>(BlockTexturePath),
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            Modulate = PendingBlockIconModulate,
+            AnchorRight = 1f,
+            AnchorBottom = 1f,
+        });
+        _pendingBlockLabel = new MegaLabel
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            MaxFontSize = 24,
+            AnchorRight = 1f,
+            AnchorBottom = 1f,
+            OffsetLeft = 10f,
+            OffsetTop = -5f,
+            OffsetRight = -9f,
+            OffsetBottom = 11f,
+        };
+        _pendingBlockLabel.AddThemeFontOverride("font", ResourceLoader.Load<Font>(BlockFontPath));
+        _pendingBlockLabel.AddThemeFontSizeOverride("font_size", 24);
+        _pendingBlockLabel.AddThemeColorOverride("font_color", StsColors.aqua);
+        _pendingBlockLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.25098f));
+        _pendingBlockLabel.AddThemeColorOverride("font_outline_color", BlockLabelOutline);
+        _pendingBlockLabel.AddThemeConstantOverride("shadow_offset_x", 4);
+        _pendingBlockLabel.AddThemeConstantOverride("shadow_offset_y", 4);
+        _pendingBlockLabel.AddThemeConstantOverride("outline_size", 14);
+        _pendingBlock.AddChild(_pendingBlockLabel);
+    }
+
+    /// <summary>The local player's combat health bar, which owns the native Block shield.</summary>
+    private NHealthBar? PlayerHealthBar()
+    {
+        if (_player == null ||
+            NCombatRoom.Instance?.GetCreatureNode(_player.Creature) is not { } creature ||
+            !GodotObject.IsInstanceValid(creature))
+            return null;
+        return creature.GetNodeOrNull<NCreatureStateDisplay>("%HealthBar")
+            ?.GetNodeOrNull<NHealthBar>("%HealthBar");
+    }
+
+    private void FreePendingBlock()
+    {
+        if (_pendingBlock != null && GodotObject.IsInstanceValid(_pendingBlock))
+            _pendingBlock.QueueFree();
+        _pendingBlock = null;
+        _pendingBlockLabel = null;
     }
 
     /// <summary>

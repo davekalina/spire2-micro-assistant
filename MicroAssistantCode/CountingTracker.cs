@@ -2,10 +2,13 @@ using Godot;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Relics;
+using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Cards;
+using MegaCrit.Sts2.Core.Models.Orbs;
 using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Models.Relics;
+using MegaCrit.Sts2.Core.ValueProps;
 
 namespace MicroAssistant.MicroAssistantCode;
 
@@ -51,7 +54,8 @@ internal static class CountingTracker
         Func<RelicModel, bool> Primed,
         Func<RelicModel, EndTurnState, BadgeTip?> EndTurnTip,
         Func<RelicModel, CardModel, string?>? NextCount = null,
-        bool Persistent = false);
+        bool Persistent = false,
+        Func<RelicModel, int>? PendingBlock = null);
 
     private sealed record PowerSemantics(
         Func<PowerModel, Player, CardModel, CardPlayEffect> PlayEffect,
@@ -60,7 +64,8 @@ internal static class CountingTracker
         Func<PowerModel, Player, bool> Primed,
         Func<PowerModel, Player, EndTurnState, BadgeTip?> EndTurnTip,
         Func<PowerModel, Player, string>? NextCount = null,
-        bool TriggersWhileContributing = false);
+        bool TriggersWhileContributing = false,
+        Func<PowerModel, Player, int>? PendingBlock = null);
 
     private static readonly Dictionary<Type, RelicSemantics> Relics = new()
     {
@@ -131,7 +136,10 @@ internal static class CountingTracker
                 Title(relic),
                 state == EndTurnState.Active
                     ? $"Will gain {IntVar(relic, "Block")} Block when this turn ends."
-                    : "Will NOT gain Block this turn.")),
+                    : "Will NOT gain Block this turn."),
+            PendingBlock: relic => CountingRules.PendingBlockGain(
+                CountingRules.AvoidanceEndTurn(!CombatQueries.AnyAttackPlayedThisTurn(relic.Owner)),
+                IntVar(relic, "Block"))),
 
         // Pael's Tears: ending the turn with energy to spare earns energy at the
         // start of the next one. The card worth warning about is the one that would
@@ -347,7 +355,8 @@ internal static class CountingTracker
             Primed: _ => false,
             EndTurnTip: (relic, _) => new BadgeTip(
                 Title(relic),
-                $"Will gain {CloakClaspBlock(relic)} Block when this turn ends.")),
+                $"Will gain {CloakClaspBlock(relic)} Block when this turn ends."),
+            PendingBlock: CloakClaspBlock),
 
         // Paper Phrog deepens Vulnerable; attacks carry its icon as a reminder
         // while any enemy is currently Vulnerable.
@@ -466,7 +475,8 @@ internal static class CountingTracker
             Primed: (_, _) => false,
             EndTurnTip: (power, _, _) => new BadgeTip(
                 Title(power),
-                $"Will gain {power.Amount} Block when this turn ends.")),
+                $"Will gain {power.Amount} Block when this turn ends."),
+            PendingBlock: (power, _) => power.Amount),
 
         // Panache: every fifth play hits all enemies; the counter is public via its
         // CardsLeft DynamicVar and counts down. It fires at zero and restarts from
@@ -590,6 +600,39 @@ internal static class CountingTracker
         return badges;
     }
 
+    /// <summary>
+    /// The Block that ending the turn right now would grant: every tracked source
+    /// that is about to fire (Orichalcum, Fake Orichalcum, Ripple Basin, Cloak
+    /// Clasp, Plating) plus each Frost orb's end-of-turn passive, as many times as
+    /// it will trigger. Each gain goes through Hook.ModifyBlock — the same pass the
+    /// game's card previews make — so No Block and future modifiers read right.
+    /// </summary>
+    public static int PendingEndTurnBlock(Player player)
+    {
+        var creature = player.Creature;
+        if (creature.CombatState is not { } state)
+            return 0;
+        var gains = new List<decimal>();
+        foreach (var (relic, semantics) in TrackedRelicPairs(player))
+            if (semantics.PendingBlock?.Invoke(relic) is > 0 and var amount)
+                gains.Add(amount);
+        foreach (var (power, semantics) in TrackedPowerPairs(player))
+            if (semantics.PendingBlock?.Invoke(power, player) is > 0 and var amount)
+                gains.Add(amount);
+        // Frost orbs: OrbModel.TriggerPassive's own count (Gold-Plated Cables adds
+        // one for the front orb); the passive value already carries Focus.
+        foreach (var orb in player.PlayerCombatState?.OrbQueue.Orbs ?? [])
+        {
+            if (orb is not FrostOrb)
+                continue;
+            var triggers = Hook.ModifyOrbPassiveTriggerCount(state, orb, 1, out _);
+            for (var i = 0; i < triggers; i++)
+                gains.Add(orb.PassiveVal);
+        }
+        return gains.Sum(gain => (int)Hook.ModifyBlock(
+            state, creature, gain, ValueProp.Unpowered, null, null, out _));
+    }
+
     /// <summary>The player's relics this mod understands, for event subscription.</summary>
     public static IEnumerable<RelicModel> TrackedRelics(Player player) =>
         TrackedRelicPairs(player).Select(pair => pair.Relic);
@@ -654,7 +697,12 @@ internal static class CountingTracker
             Title(relic),
             state == EndTurnState.Active
                 ? $"Will gain {IntVar(relic, "Block")} Block when this turn ends."
-                : "Will NOT gain Block this turn."));
+                : "Will NOT gain Block this turn."),
+        // Orichalcum reads the Block before anything else at turn end grants any
+        // (its very-early hook), so only Block already up now cancels it.
+        PendingBlock: relic => CountingRules.PendingBlockGain(
+            CountingRules.OrichalcumEndTurn(relic.Owner.Creature.Block),
+            IntVar(relic, "Block")));
 
     /// <summary>First-N-per-turn powers: count down the allowance, X when spent.</summary>
     private static PowerSemantics Allowance(

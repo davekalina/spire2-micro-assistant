@@ -28,6 +28,16 @@ internal static class ViewOptions
     /// default.</summary>
     public static bool ShowSetupRelics = true;
 
+    /// <summary>Anchor the setup bar in the upper left, just under the relic bar
+    /// (however many rows it wraps to), instead of the top-center slot it shares
+    /// with the "Will trigger:" banner. On by default.</summary>
+    public static bool SetupTopLeft = true;
+
+    /// <summary>Show the Block that ending the turn would grant — Orichalcum,
+    /// Cloak Clasp, Plating, Frost orbs, ... — as a "+N" shield just left of the
+    /// player's native Block shield. On by default.</summary>
+    public static bool ShowPendingBlock = true;
+
     /// <summary>The focused card's badge display moves to the top-center panel
     /// (sized by Scale, never showing the card number).</summary>
     public static bool ShowUpTop;

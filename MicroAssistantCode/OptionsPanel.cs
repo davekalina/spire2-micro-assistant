@@ -101,6 +101,10 @@ internal sealed class OptionsPanel : IDisposable
         AddToggle(rows, "Show Up Top", () => ViewOptions.ShowUpTop, v => ViewOptions.ShowUpTop = v);
         AddToggle(rows, "Setup Relics Bar",
             () => ViewOptions.ShowSetupRelics, v => ViewOptions.ShowSetupRelics = v);
+        AddToggle(rows, "Setup Relics Top Left",
+            () => ViewOptions.SetupTopLeft, v => ViewOptions.SetupTopLeft = v);
+        AddToggle(rows, "Pending Block",
+            () => ViewOptions.ShowPendingBlock, v => ViewOptions.ShowPendingBlock = v);
         AddToggle(rows, "Always On", () => ViewOptions.AlwaysOn, v => ViewOptions.AlwaysOn = v);
         AddToggle(rows, "Card Overlay",
             () => ViewOptions.CardOverlay, v => ViewOptions.CardOverlay = v);
@@ -120,7 +124,7 @@ internal sealed class OptionsPanel : IDisposable
         _dropdown.OffsetLeft = -352f;
         _dropdown.OffsetRight = -12f;
         _dropdown.OffsetTop = 134f;
-        _dropdown.OffsetBottom = 452f;
+        _dropdown.OffsetBottom = 508f;
         _root.AddChild(_dropdown);
 
         parent.AddChild(_root);

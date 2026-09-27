@@ -176,6 +176,24 @@ public class CountingRulesTests
     public void Orichalcum_end_turn(int block, EndTurnState expected) =>
         Assert.Equal(expected, CountingRules.OrichalcumEndTurn(block));
 
+    // Pending Block: a source adds its amount only while it will actually fire, so
+    // any Block already up cancels Orichalcum's share of the shield.
+    [Theory]
+    [InlineData(0, 6)]
+    [InlineData(1, 0)]
+    [InlineData(12, 0)]
+    public void Orichalcum_pending_block(int block, int expected) =>
+        Assert.Equal(expected,
+            CountingRules.PendingBlockGain(CountingRules.OrichalcumEndTurn(block), amount: 6));
+
+    [Theory]
+    [InlineData(EndTurnState.Active, 4, 4)]
+    [InlineData(EndTurnState.Broken, 4, 0)]
+    [InlineData(EndTurnState.Hidden, 4, 0)]
+    [InlineData(EndTurnState.Active, -2, 0)]
+    public void Pending_block_gain(EndTurnState state, int amount, int expected) =>
+        Assert.Equal(expected, CountingRules.PendingBlockGain(state, amount));
+
     // Allowance powers: matching cards contribute while charges remain, X at zero.
     [Theory]
     [InlineData(false, 2, CardPlayEffect.None)]

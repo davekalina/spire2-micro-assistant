@@ -19,7 +19,7 @@ pipeline work. Those are platform facts. This file is how I want the work done.
 | Dependencies | None yet |
 
 The mod shows how counting sources — relics and powers — react to what the player
-is about to do, on two surfaces during combat:
+is about to do, on three surfaces during combat:
 
 - **Above the focused hand card** (mouse hover and controller focus both count): a
   centered row of badges — the source's atlas icon with its current count, or X-ed
@@ -29,6 +29,13 @@ is about to do, on two surfaces during combat:
   what each counter is about to become — in the aqua projection color.
 - **Above the End Turn button**: badges for sources where ending the turn is the
   decision — will/will-NOT verdicts with native hover tips.
+- **Beside the player's Block shield**: a translucent "+N" shield just left of the
+  native one, carrying the Block that ending the turn now would grant
+  (`CountingTracker.PendingEndTurnBlock`: each registry entry's `PendingBlock` —
+  Orichalcum, Fake Orichalcum, Ripple Basin, Cloak Clasp, Plating — plus every
+  Frost orb passive, each gain passed through `Hook.ModifyBlock` as the card
+  previews do). Orichalcum drops out the moment any Block is up, because it
+  checks Block in its very-early turn-end hook, before any other source grants.
 
 Covered sources (one registry entry each in `CountingTracker`): relics —
 Pocketwatch, Pendulum, Pen Nib, Nunchaku, Kunai, Shuriken, Ornamental Fan,
@@ -73,9 +80,11 @@ The layering that must not regress silently:
 - The Harmony patches are `NCombatUi._Ready`/`_ExitTree` in `CombatUiPatch` and a
   postfix on the private `NPlayerHand.StartCardPlay` (the one transition no game
   event covers: hover→play raises no HoverChanged and moves no combat state);
-  every game→mod boundary is wrapped in `Guard`. The one private read is the
-  hand's `_currentCardPlay` Godot property (with a child-scan fallback) for the
-  follow-the-played-card behavior.
+  every game→mod boundary is wrapped in `Guard`. The private reads are Godot
+  properties: the hand's `_currentCardPlay` (with a child-scan fallback) for the
+  follow-the-played-card behavior, and the health bar's `_originalBlockPosition`
+  (falling back to the Block shield's live position) so the pending-Block shield
+  does not follow the native shield's slide-in tween.
 
 ### Surfaces to audit
 
@@ -92,14 +101,17 @@ dependency, and it should not happen before the defaults settle.
 The experimental view controls (behind the settings-gear icon left of the
 version text, `ViewOptions` + `OptionsPanel`):
 a **badge scale slider** (0.5–3.0 in 0.05 steps, **defaulting to 1.5**; replaced
-the Big & Bold toggle, which was scale 2.0) plus eight switches — Replace Card
+the Big & Bold toggle, which was scale 2.0) plus ten switches — Replace Card
 Count defaults ON, it won its audition; **Hide Negated Payoffs** drops the
 slashed will-NOT End Turn badges instead of showing them; **Setup Relics Bar**
 (**defaults ON**) shows the nine run-persistent relics (Pen Nib, Nunchaku,
 Tuning Fork, Iron Club, Joss Paper, Pendulum, both Happy Flowers, Pollinous Core
 — the `Persistent` registry flag, matching the game's `[SavedProperty]`
-counters) in the top-panel slot, always on while enabled, with the card panel
-stacking beneath it.
+counters), always on while enabled; **Setup Relics Top Left** (**defaults ON**)
+hangs it from the relic bar's last row (`NRelicInventory.GetBottomOfInventory`,
+re-placed on the bar's `SortChildren`, below the co-op player list when there is
+one) at relative z, and off it takes the top-panel slot with the card panel
+stacking beneath it; **Pending Block** (**defaults ON**) shows the "+N" shield.
 
 The slider governs the mod's **own** panels directly — the focused card's
 display, the setup bar, and the "Will trigger:" banner — so the setup bar is 1.5
@@ -134,8 +146,13 @@ Any directional change must be applied across all of these:
 - the "Will trigger:" banner (top-center at 20% down the screen; visible only
   while a play in progress will fire a source: primed counters, armed first-X
   sources, active allowances);
-- the setup bar and its stacking with the top panel (both on, either alone,
-  and at every slider scale);
+- the setup bar in both placements: centered, stacking with the top panel (both
+  on, either alone, at every slider scale); top left, under one, two, and three
+  relic rows, following the bar as a relic is gained mid-combat, and below the
+  co-op player list;
+- the pending-Block shield (zero Block, Block up cancelling Orichalcum, Cloak
+  Clasp moving with hand size, Frost orbs with Focus and Gold-Plated Cables, gone
+  once End Turn is pressed and on enemy turns);
 - the two captioned panels — "Setup Relics" and "Will trigger:" — where the
   caption is a line inside the same backing, so the panel's band has to reserve
   `BadgeStrip.TitleRowHeight * scale` on top of the icon row or the backing

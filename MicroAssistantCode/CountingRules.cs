@@ -161,6 +161,14 @@ public static class CountingRules
         currentBlock == 0 ? EndTurnState.Active : EndTurnState.Broken;
 
     /// <summary>
+    /// What an end-of-turn block source adds to the pending Block: its amount while
+    /// its End Turn verdict is Active, nothing once lost — Orichalcum with any Block
+    /// already up, Ripple Basin after an attack.
+    /// </summary>
+    public static int PendingBlockGain(EndTurnState state, int amount) =>
+        state == EndTurnState.Active ? Math.Max(0, amount) : 0;
+
+    /// <summary>
     /// Allowance powers (Echo Form, Void Form, ...): the first N matching plays each
     /// turn get the benefit; once the allowance is spent a matching card is X-ed —
     /// it no longer receives the effect.

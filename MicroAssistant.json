@@ -3,7 +3,7 @@
   "name": "Micro Assistant",
   "author": "realtruegravy",
   "description": "Shows which counting relics each card play affects, on the card and by the End Turn button.",
-  "version": "v0.15.1",
+  "version": "v0.16.0",
   "min_game_version": "0.111.0",
   "has_pck": false,
   "has_dll": true,
