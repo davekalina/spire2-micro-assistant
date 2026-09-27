@@ -22,11 +22,13 @@ internal sealed record BadgeTip(string Title, string Body);
 /// what the counter is about to become, not what it is. WillTrigger marks a badge
 /// whose source fires on (or applies its effect to) this very play — the trigger
 /// banner is built from these. Tip is set only on End Turn badges; hand badges
-/// must not catch the mouse.
+/// must not catch the mouse. BlockValue marks a count that is an amount of Block,
+/// which the card readout prints in the Block blue.
 /// </summary>
 internal sealed record SourceBadge(
     Texture2D Icon, string Id, string? CountText, bool Broken, bool Primed,
-    bool Projected = false, bool WillTrigger = false, BadgeTip? Tip = null);
+    bool Projected = false, bool WillTrigger = false, BadgeTip? Tip = null,
+    bool BlockValue = false);
 
 /// <summary>
 /// Which counting sources — relics and powers — care about a card play or about
@@ -55,7 +57,8 @@ internal static class CountingTracker
         Func<RelicModel, EndTurnState, BadgeTip?> EndTurnTip,
         Func<RelicModel, CardModel, string?>? NextCount = null,
         bool Persistent = false,
-        Func<RelicModel, int>? PendingBlock = null);
+        Func<RelicModel, int>? PendingBlock = null,
+        bool CountIsBlock = false);
 
     private sealed record PowerSemantics(
         Func<PowerModel, Player, CardModel, CardPlayEffect> PlayEffect,
@@ -65,7 +68,8 @@ internal static class CountingTracker
         Func<PowerModel, Player, EndTurnState, BadgeTip?> EndTurnTip,
         Func<PowerModel, Player, string>? NextCount = null,
         bool TriggersWhileContributing = false,
-        Func<PowerModel, Player, int>? PendingBlock = null);
+        Func<PowerModel, Player, int>? PendingBlock = null,
+        bool CountIsBlock = false);
 
     private static readonly Dictionary<Type, RelicSemantics> Relics = new()
     {
@@ -139,7 +143,8 @@ internal static class CountingTracker
                     : "Will NOT gain Block this turn."),
             PendingBlock: relic => CountingRules.PendingBlockGain(
                 CountingRules.AvoidanceEndTurn(!CombatQueries.AnyAttackPlayedThisTurn(relic.Owner)),
-                IntVar(relic, "Block"))),
+                IntVar(relic, "Block")),
+            CountIsBlock: true),
 
         // Pael's Tears: ending the turn with energy to spare earns energy at the
         // start of the next one. The card worth warning about is the one that would
@@ -356,7 +361,8 @@ internal static class CountingTracker
             EndTurnTip: (relic, _) => new BadgeTip(
                 Title(relic),
                 $"Will gain {CloakClaspBlock(relic)} Block when this turn ends."),
-            PendingBlock: CloakClaspBlock),
+            PendingBlock: CloakClaspBlock,
+            CountIsBlock: true),
 
         // Paper Phrog deepens Vulnerable; attacks carry its icon as a reminder
         // while any enemy is currently Vulnerable.
@@ -464,7 +470,8 @@ internal static class CountingTracker
             EndTurnTip: (_, _, _) => null,
             // Every exhaust pays out, so a contributing card is always a trigger —
             // there is no Nth-play threshold to wait for.
-            TriggersWhileContributing: true),
+            TriggersWhileContributing: true,
+            CountIsBlock: true),
 
         // Plating grants its stacks as Block when the turn ends, then decays; the
         // End Turn badge is the reminder, carrying the amount about to be granted.
@@ -476,7 +483,8 @@ internal static class CountingTracker
             EndTurnTip: (power, _, _) => new BadgeTip(
                 Title(power),
                 $"Will gain {power.Amount} Block when this turn ends."),
-            PendingBlock: (power, _) => power.Amount),
+            PendingBlock: (power, _) => power.Amount,
+            CountIsBlock: true),
 
         // Panache: every fifth play hits all enemies; the counter is public via its
         // CardsLeft DynamicVar and counts down. It fires at zero and restarts from
@@ -520,7 +528,8 @@ internal static class CountingTracker
                 Broken: effect == CardPlayEffect.Breaks,
                 Primed: next == null && semantics.Primed(relic),
                 Projected: next != null,
-                WillTrigger: willTrigger));
+                WillTrigger: willTrigger,
+                BlockValue: semantics.CountIsBlock));
         }
         foreach (var (power, semantics) in TrackedPowerPairs(player))
         {
@@ -541,7 +550,8 @@ internal static class CountingTracker
                 Broken: effect == CardPlayEffect.Breaks,
                 Primed: next == null && semantics.Primed(power, player),
                 Projected: next != null,
-                WillTrigger: willTrigger));
+                WillTrigger: willTrigger,
+                BlockValue: semantics.CountIsBlock));
         }
         return badges;
     }
@@ -561,7 +571,8 @@ internal static class CountingTracker
                 semantics.CountText(relic),
                 Broken: state == EndTurnState.Broken,
                 semantics.Primed(relic),
-                Tip: semantics.EndTurnTip(relic, state)));
+                Tip: semantics.EndTurnTip(relic, state),
+                BlockValue: semantics.CountIsBlock));
         }
         foreach (var (power, semantics) in TrackedPowerPairs(player))
         {
@@ -574,7 +585,8 @@ internal static class CountingTracker
                 semantics.CountText(power, player),
                 Broken: state == EndTurnState.Broken,
                 semantics.Primed(power, player),
-                Tip: semantics.EndTurnTip(power, player, state)));
+                Tip: semantics.EndTurnTip(power, player, state),
+                BlockValue: semantics.CountIsBlock));
         }
         return badges;
     }
@@ -702,7 +714,8 @@ internal static class CountingTracker
         // (its very-early hook), so only Block already up now cancels it.
         PendingBlock: relic => CountingRules.PendingBlockGain(
             CountingRules.OrichalcumEndTurn(relic.Owner.Creature.Block),
-            IntVar(relic, "Block")));
+            IntVar(relic, "Block")),
+        CountIsBlock: true);
 
     /// <summary>First-N-per-turn powers: count down the allowance, X when spent.</summary>
     private static PowerSemantics Allowance(

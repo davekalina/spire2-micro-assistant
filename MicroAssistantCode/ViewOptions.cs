@@ -15,9 +15,10 @@ internal static class ViewOptions
     /// Size multiplier for the mod's own panels — the focused card's badge display
     /// wherever it is placed, and the setup bar (the slider that replaced the Big
     /// &amp; Bold toggle; that mode was 2.0). Slider range 0.5..3.0 in 0.05 steps,
-    /// defaulting to 1.5: at 1.0 the setup bar is legible but not glanceable.
+    /// defaulting to 1.0: the card readout and setup bar are drawn to the design's
+    /// own sizes (52px card icons, 44px setup icons), which 1.0 reproduces.
     /// </summary>
-    public static float Scale = 1.5f;
+    public static float Scale = 1f;
 
     /// <summary>Extend Scale to the surfaces that sit on native UI as well —
     /// unfocused hand strips and the End Turn badges.</summary>

@@ -86,24 +86,26 @@ internal sealed class CombatOverlayView : IDisposable
     private const float TopPanelAnchorY = 0.2f;
     private const float PanelGap = 6f;
 
-    // Setup Relics Top Left: the setup bar's top-left corner sits this far under
-    // the relic bar's last row, at the bar's own left edge.
-    private const float SetupUnderRelicBarGap = 4f;
+    // The setup bar hangs this far right of and below the relic bar's last row:
+    // the design's (16, 154) under a one-row bar at (12, 82) with 68px rows. The
+    // fallback is that same spot, for when there is no relic bar to measure.
+    private static readonly Vector2 SetupUnderRelicBarGap = new(4f, 4f);
+    private static readonly Vector2 SetupFallbackCorner = new(16f, 154f);
 
     // The pending-Block shield copies the native %BlockContainer (60x60, block.png,
     // a 24pt Kreon label inset 10/-5/-9/11) and sits just left of it, overlapping
-    // by a sliver so the pair reads as one cluster. Translucent, with an aqua
-    // count: this mod's color for a value that is about to be, not one that is.
+    // by a sliver so the pair reads as one cluster. Translucent, with its count in
+    // the design system's Block blue, as the card readout prints Block values.
     private const string BlockTexturePath = "res://images/ui/combat/block.png";
     private const string BlockFontPath = "res://themes/kreon_bold_glyph_space_one.tres";
     private static readonly Vector2 PendingBlockSize = new(60f, 60f);
     private const float PendingBlockOverlap = 6f;
     private static readonly Color PendingBlockIconModulate = new(1f, 1f, 1f, 0.6f);
     private static readonly Color BlockLabelOutline = new(0.042f, 0.3318f, 0.42f);
+    private static readonly Color PendingBlockCount = new("8CD9EC");
 
-    // The captions on the two panels that share that slot. Neither is a game
-    // string, so neither is localized — the same as this mod's hover-tip bodies.
-    private const string SetupTitle = "Setup Relics";
+    // The "Will trigger:" banner's caption. Not a game string, so not localized —
+    // the same as this mod's hover-tip bodies and the setup bar's SETUP label.
     private const string TriggerTitle = "Will trigger:";
 
     private readonly NCombatUi _ui;
@@ -130,6 +132,9 @@ internal sealed class CombatOverlayView : IDisposable
 
     /// <summary>Whether the setup bar is currently taking room above the top panel.</summary>
     private bool _setupVisible;
+
+    /// <summary>The setup bar's bottom edge in the combat UI's space, as last placed.</summary>
+    private float _setupBottom;
 
     public CombatOverlayView(NCombatUi ui) => _ui = ui;
 
@@ -449,9 +454,8 @@ internal sealed class CombatOverlayView : IDisposable
 
     /// <summary>
     /// The always-on setup bar: the run-persistent relics, whose counters carry
-    /// between combats. PlaceSetupPanel puts it in the upper slot at the top-panel
-    /// anchor, with the card panel stacking beneath it, or under the relic bar.
-    /// Captioned, because a bare row of relic icons does not explain itself.
+    /// between combats, labelled SETUP. Top left it is the design's band, a plate
+    /// under the relic bar; centered it is the lighter dock strip.
     /// </summary>
     private void RefreshSetupPanel()
     {
@@ -462,51 +466,43 @@ internal sealed class CombatOverlayView : IDisposable
                 ? CountingTracker.ForSetup(_player)
                 : [];
         PlaceSetupPanel();
-        BadgeStrip.SetBadges(
-            _setupPanel, badges, backed: true, scale: ViewOptions.Scale, title: SetupTitle);
+        Readout.Set(_setupPanel, badges, SetupStyle(), ViewOptions.Scale);
         _setupPanel.Visible = badges.Count > 0;
-        // Only the centered bar takes room from the card panel's slot.
+        // Only the centered dock can reach down to the card panel's slot.
         _setupVisible = badges.Count > 0 && !ViewOptions.SetupTopLeft;
     }
 
+    private static ReadoutStyle SetupStyle() =>
+        ViewOptions.SetupTopLeft ? ReadoutStyle.SetupBand : ReadoutStyle.SetupDock;
+
     /// <summary>
-    /// Where the setup bar sits. Centered, it spans the screen at the top-panel
-    /// anchor with the absolute z the shared slot needs over the targeting arrow.
-    /// Top left, it hangs from the bottom of the relic bar at relative z, so the
-    /// relic bar's own hover tips still draw over it, and grows right and down
-    /// from that corner to fit its content.
+    /// Where the setup bar sits: its top edge just under the relic bar's last row
+    /// either way (a wrapped bar spans the screen, so a centered dock at a fixed y
+    /// would sit on its second row). Top left it starts at the bar's left edge and
+    /// grows right; centered it spans the screen and centers. Relative z, so the
+    /// relic bar's own hover tips still draw over it.
     /// </summary>
     private void PlaceSetupPanel()
     {
         if (_setupPanel == null || !GodotObject.IsInstanceValid(_setupPanel))
             return;
-        var height = PanelHeight(ViewOptions.Scale, titled: true);
-        if (ViewOptions.SetupTopLeft && UnderRelicBar() is { } corner)
-        {
-            _setupPanel.Alignment = BoxContainer.AlignmentMode.Begin;
-            _setupPanel.AnchorLeft = 0f;
-            _setupPanel.AnchorRight = 0f;
-            _setupPanel.AnchorTop = 0f;
-            _setupPanel.AnchorBottom = 0f;
-            _setupPanel.OffsetLeft = corner.X;
-            _setupPanel.OffsetRight = corner.X;
-            _setupPanel.OffsetTop = corner.Y;
-            _setupPanel.OffsetBottom = corner.Y + height;
-            _setupPanel.ZAsRelative = true;
-            _setupPanel.ZIndex = 0;
-            return;
-        }
-        _setupPanel.Alignment = BoxContainer.AlignmentMode.Center;
+        var height = Readout.Height(SetupStyle(), ViewOptions.Scale);
+        var corner = UnderRelicBar() ?? SetupFallbackCorner;
+        var topLeft = ViewOptions.SetupTopLeft;
+        _setupPanel.Alignment = topLeft
+            ? BoxContainer.AlignmentMode.Begin
+            : BoxContainer.AlignmentMode.Center;
         _setupPanel.AnchorLeft = 0f;
-        _setupPanel.AnchorRight = 1f;
-        _setupPanel.AnchorTop = TopPanelAnchorY;
-        _setupPanel.AnchorBottom = TopPanelAnchorY;
-        _setupPanel.OffsetLeft = 0f;
-        _setupPanel.OffsetRight = 0f;
-        _setupPanel.OffsetTop = -height / 2f;
-        _setupPanel.OffsetBottom = height / 2f;
-        _setupPanel.ZAsRelative = false;
-        _setupPanel.ZIndex = InPlayZ;
+        _setupPanel.AnchorRight = topLeft ? 0f : 1f;
+        _setupPanel.AnchorTop = 0f;
+        _setupPanel.AnchorBottom = 0f;
+        _setupPanel.OffsetLeft = topLeft ? corner.X : 0f;
+        _setupPanel.OffsetRight = topLeft ? corner.X : 0f;
+        _setupPanel.OffsetTop = corner.Y;
+        _setupPanel.OffsetBottom = corner.Y + height;
+        _setupPanel.ZAsRelative = true;
+        _setupPanel.ZIndex = 0;
+        _setupBottom = corner.Y + height;
     }
 
     /// <summary>
@@ -526,7 +522,7 @@ internal sealed class CombatOverlayView : IDisposable
             foreach (var child in players.GetChildren())
                 if (child is Control { Visible: true } row)
                     bottom.Y = Math.Max(bottom.Y, row.GetGlobalRect().End.Y);
-        bottom.Y += SetupUnderRelicBarGap;
+        bottom += SetupUnderRelicBarGap;
         return _ui.GetGlobalTransform().AffineInverse() * bottom;
     }
 
@@ -601,7 +597,7 @@ internal sealed class CombatOverlayView : IDisposable
         };
         _pendingBlockLabel.AddThemeFontOverride("font", ResourceLoader.Load<Font>(BlockFontPath));
         _pendingBlockLabel.AddThemeFontSizeOverride("font_size", 24);
-        _pendingBlockLabel.AddThemeColorOverride("font_color", StsColors.aqua);
+        _pendingBlockLabel.AddThemeColorOverride("font_color", PendingBlockCount);
         _pendingBlockLabel.AddThemeColorOverride("font_shadow_color", new Color(0f, 0f, 0f, 0.25098f));
         _pendingBlockLabel.AddThemeColorOverride("font_outline_color", BlockLabelOutline);
         _pendingBlockLabel.AddThemeConstantOverride("shadow_offset_x", 4);
@@ -794,7 +790,7 @@ internal sealed class CombatOverlayView : IDisposable
         var scale = ViewOptions.ScaleAlwaysOn || (active && !ViewOptions.ShowUpTop)
             ? ViewOptions.Scale
             : 1f;
-        var height = PanelHeight(scale, titled: false);
+        var height = Readout.Height(ReadoutStyle.Card, scale);
         var (top, bottom) = ViewOptions.CardOverlay
             ? (OverlayCenter - height / 2f, OverlayCenter + height / 2f)
             : ViewOptions.ReplaceCardCount
@@ -809,8 +805,7 @@ internal sealed class CombatOverlayView : IDisposable
         var badges = card != null
             ? CountingTracker.ForCardPlay(card.Owner, card, projected)
             : [];
-        BadgeStrip.SetBadges(
-            strip, badges, backed: true, scale: scale, prefix: CountPrefix(holder));
+        Readout.Set(strip, badges, ReadoutStyle.Card, scale, CountPrefix(holder));
         SyncIndexLabel(holder, hide: ViewOptions.ReplaceCardCount && badges.Count > 0);
     }
 
@@ -836,7 +831,7 @@ internal sealed class CombatOverlayView : IDisposable
         var scale = ViewOptions.Scale;
         if (!ViewOptions.ShowUpTop)
         {
-            SizeTopPanel(scale, titled: true);
+            SizeTopPanel(PanelHeight(scale, titled: true));
             var triggering = card != null && inPlay != null
                 ? CountingTracker.ForCardPlay(card.Owner, card, projected: true)
                     .Where(badge => badge.WillTrigger).ToList()
@@ -845,21 +840,21 @@ internal sealed class CombatOverlayView : IDisposable
             return;
         }
 
-        SizeTopPanel(scale, titled: false);
+        SizeTopPanel(Readout.Height(ReadoutStyle.Card, scale));
         var badges = card != null
             ? CountingTracker.ForCardPlay(card.Owner, card, projected: inPlay != null)
             : [];
-        BadgeStrip.SetBadges(_topPanel, badges, backed: true, scale: scale);
+        Readout.Set(_topPanel, badges, ReadoutStyle.Card, scale);
         _topPanel.Visible = badges.Count > 0;
     }
 
-    private void SizeTopPanel(float scale, bool titled)
+    private void SizeTopPanel(float height)
     {
-        var half = PanelHeight(scale, titled) / 2f;
-        // Stack under the setup bar when it is up, so the two never overlap. The
-        // shift is the setup bar's own height — its scale, and its caption.
+        var half = height / 2f;
+        // Drop below the centered setup dock when the two would touch; the dock
+        // hangs from the relic bar, so its bottom moves with the bar's rows.
         var shift = _setupVisible
-            ? PanelHeight(ViewOptions.Scale, titled: true) + PanelGap
+            ? Math.Max(0f, _setupBottom + PanelGap - (TopPanelAnchorY * _ui.Size.Y - half))
             : 0f;
         _topPanel!.OffsetTop = -half + shift;
         _topPanel.OffsetBottom = half + shift;

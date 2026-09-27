@@ -100,7 +100,7 @@ dependency, and it should not happen before the defaults settle.
 
 The experimental view controls (behind the settings-gear icon left of the
 version text, `ViewOptions` + `OptionsPanel`):
-a **badge scale slider** (0.5–3.0 in 0.05 steps, **defaulting to 1.5**; replaced
+a **badge scale slider** (0.5–3.0 in 0.05 steps, **defaulting to 1.0**; replaced
 the Big & Bold toggle, which was scale 2.0) plus ten switches — Replace Card
 Count defaults ON, it won its audition; **Hide Negated Payoffs** drops the
 slashed will-NOT End Turn badges instead of showing them; **Setup Relics Bar**
@@ -108,15 +108,15 @@ slashed will-NOT End Turn badges instead of showing them; **Setup Relics Bar**
 Tuning Fork, Iron Club, Joss Paper, Pendulum, both Happy Flowers, Pollinous Core
 — the `Persistent` registry flag, matching the game's `[SavedProperty]`
 counters), always on while enabled; **Setup Relics Top Left** (**defaults ON**)
-hangs it from the relic bar's last row (`NRelicInventory.GetBottomOfInventory`,
-re-placed on the bar's `SortChildren`, below the co-op player list when there is
-one) at relative z, and off it takes the top-panel slot with the card panel
-stacking beneath it; **Pending Block** (**defaults ON**) shows the "+N" shield.
+makes it the design's left *band* at the relic bar's left edge, and off it is the
+centered *dock*. Either way its top hangs just under the relic bar's last row
+(`NRelicInventory.GetBottomOfInventory`, re-placed on the bar's `SortChildren`,
+below the co-op player list when there is one) at relative z, and the
+"Will trigger:" banner drops below the dock when they would touch; **Pending Block** (**defaults ON**) shows the "+N" shield.
 
 The slider governs the mod's **own** panels directly — the focused card's
-display, the setup bar, and the "Will trigger:" banner — so the setup bar is 1.5
-out of the box and nothing sharing the top slot is sized differently from its
-neighbour. **Scale Always On** extends it to the surfaces that ride native UI:
+display, the setup bar, and the "Will trigger:" banner. At 1.0 the card readout
+and setup bar are exactly the design's sizes. **Scale Always On** extends it to the surfaces that ride native UI:
 unfocused hand strips and the End Turn badges. A change to the setup bar's scale
 must move the top panel's stacking shift with it, or the two overlap.
 
@@ -153,16 +153,18 @@ Any directional change must be applied across all of these:
 - the pending-Block shield (zero Block, Block up cancelling Orichalcum, Cloak
   Clasp moving with hand size, Frost orbs with Focus and Gold-Plated Cables, gone
   once End Turn is pressed and on enemy turns);
-- the two captioned panels — "Setup Relics" and "Will trigger:" — where the
-  caption is a line inside the same backing, so the panel's band has to reserve
-  `BadgeStrip.TitleRowHeight * scale` on top of the icon row or the backing
-  clips it (`PanelHeight` is the single place that arithmetic lives);
+- the card readout and the setup bar (`Readout`, built to the "Micro Assistant
+  Final" Claude Design spec: the slate plate, SETUP label, count offsets, Block
+  counts in #8CD9EC, the negated icon under the loss-red slash). Bands are sized
+  by `Readout.Height`; the "Will trigger:" banner keeps the tooltip backing and
+  its caption, sized by `PanelHeight`;
 - the badge strip above the End Turn button (active, X-ed out, hidden states; enemy
   turn, when the strip rides the button's slide-out tween);
 - the hover tips on End Turn badges (will / will NOT wording, counts read from the
   source's DynamicVars; hand badges must never catch the mouse and get no tips);
-- badge visuals shared by both strips (`BadgeStrip`: icon, count label, and the
-  broken mark — the game's own card_unplayable_icon slash roundel, not a glyph);
+- badge visuals on the End Turn surfaces and the trigger banner (`BadgeStrip`:
+  icon, count label, and the broken mark — the game's own card_unplayable_icon
+  slash roundel, not a glyph);
 - every modal surface standing in front of the board — the map, All Cards, the
   draw and discard piles, overlay-stack prompts, and in-hand card selection
   prompts such as Tyranny's start-of-turn exhaust — where the whole display must
@@ -180,7 +182,10 @@ Any directional change must be applied across all of these:
 
 ## Mod UI: match the game
 
-Treat the game's existing UI as the design system for this mod.
+Treat the game's existing UI as the design system for this mod. The one
+deliberate exception is the card readout and setup bar, which follow the
+"Micro Assistant Final" design from Claude Design (spire-mod design system);
+change them against that spec, not against native widgets.
 
 - Prefer duplicating or instantiating native game scenes, controls, textures,
   frames, hover tips, labels, buttons, selection outlines, and animations.
