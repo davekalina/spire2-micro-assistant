@@ -2,7 +2,7 @@
   "title": "Micro Assistant",
   "description": "Shows which counting relics and powers each card play affects - on the hovered card, and above the End Turn button.",
   "visibility": "unlisted",
-  "changeNote": "v0.15.1: The Setup Relics bar now hides during Tyranny and other card-selection prompts, then returns when the choice is complete.",
+  "changeNote": "v0.17.1: The card readout and the Setup Relics bar have a new look. The Setup bar sits top-center by default, just under the relic bar however many rows it wraps to, and Setup Relics Top Left in the options menu moves it to the upper left. New pending-Block shield beside your Block shows what ending the turn will add (Orichalcum, Fake Orichalcum, Ripple Basin, Cloak Clasp, Plating, Frost orbs); Orichalcum drops out as soon as you have any Block. Badge scale now defaults to 1.0.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []
