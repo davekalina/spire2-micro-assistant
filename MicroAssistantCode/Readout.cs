@@ -4,25 +4,22 @@ using MegaCrit.Sts2.addons.mega_text;
 
 namespace MicroAssistant.MicroAssistantCode;
 
-/// <summary>Which of the design's three readout shapes a panel takes.</summary>
+/// <summary>Which of the design's readout shapes a panel takes.</summary>
 internal enum ReadoutStyle
 {
     /// <summary>The badge row over a hand card (and its Show Up Top copy).</summary>
     Card,
 
-    /// <summary>The setup bar hanging under the relic bar: plate, "SETUP", divider.</summary>
-    SetupBand,
-
-    /// <summary>The setup bar centered on screen: a fading strip under a gold rule.</summary>
-    SetupDock,
+    /// <summary>The setup bar, wherever it is placed: plate, "SETUP", divider.</summary>
+    Setup,
 }
 
 /// <summary>
 /// The card readout and the setup bar, built to the "Micro Assistant Final" design
 /// (Claude Design, spire-mod design system). Every number below is that spec at
-/// 1920x1080 and scale 1, except the centered dock, which takes the left band's
-/// sizes; the scale slider multiplies all of them together, so a panel keeps its
-/// proportions at any size.
+/// 1920x1080 and scale 1; the scale slider multiplies all of them together, so a
+/// panel keeps its proportions at any size. The setup bar is the design's left
+/// band in both placements — its centered "dock" variant is deliberately unused.
 ///
 /// The plate is the design system's popup surface: a square, near-opaque slate
 /// band with a steel hairline and a deep drop shadow. Counts are Kreon bold in
@@ -47,11 +44,6 @@ internal static class Readout
     private static readonly Color PlateShadow = new(0f, 0f, 0f, 0.6f);
     private const float PlateBorderWidth = 2f;
 
-    private static readonly Color DockFill = new(18 / 255f, 27 / 255f, 30 / 255f, 0.92f);
-    private static readonly Color DockFillEnd = new(18 / 255f, 27 / 255f, 30 / 255f, 0.55f);
-    private static readonly Color DockRule = new(239 / 255f, 200 / 255f, 81 / 255f, 0.55f);
-    private const float DockRuleHeight = 2f;
-
     private static readonly Color Divider = new(1f, 248 / 255f, 226 / 255f, 0.14f);
 
     private static readonly Color Slash = new("E08D6E");
@@ -70,33 +62,23 @@ internal static class Readout
         Icon: 52f, Gap: 28f, FontSize: 24, BadgeRight: -8f, BadgeRightWide: -10f,
         BadgeBottom: -6f, PadLeft: 24f, PadTop: 11f, PadRight: 24f, PadBottom: 13f);
 
-    private static readonly Metrics BandMetrics = new(
+    private static readonly Metrics SetupMetrics = new(
         Icon: 44f, Gap: 24f, FontSize: 20, BadgeRight: -7f, BadgeRightWide: -9f,
         BadgeBottom: -5f, PadLeft: 22f, PadTop: 10f, PadRight: 22f, PadBottom: 12f,
         LabelFontSize: 20, LabelGap: 20f);
 
-    // The dock keeps its own look (fade, gold rule, no divider) but takes the band's
-    // sizes: the design's dock numbers (40px icons, 17pt label, 7/9 padding) read
-    // too small in game, and the two placements should be the same size.
-    private static readonly Metrics DockMetrics = BandMetrics;
-
-    private static Metrics For(ReadoutStyle style) => style switch
-    {
-        ReadoutStyle.SetupBand => BandMetrics,
-        ReadoutStyle.SetupDock => DockMetrics,
-        _ => CardMetrics,
-    };
+    private static Metrics For(ReadoutStyle style) =>
+        style == ReadoutStyle.Setup ? SetupMetrics : CardMetrics;
 
     /// <summary>
-    /// The panel's full height at this scale: icon row, padding, and the frame (the
-    /// plate's border top and bottom, or the dock's rule). Callers sizing a band
-    /// use this, so the panel never clips or floats in slack.
+    /// The panel's full height at this scale: icon row, padding, and the plate's
+    /// border top and bottom. Callers sizing a band use this, so the panel never
+    /// clips or floats in slack.
     /// </summary>
     public static float Height(ReadoutStyle style, float scale)
     {
         var m = For(style);
-        var frame = style == ReadoutStyle.SetupDock ? DockRuleHeight : 2f * PlateBorderWidth;
-        return (m.Icon + m.PadTop + m.PadBottom + frame) * scale;
+        return (m.Icon + m.PadTop + m.PadBottom + 2f * PlateBorderWidth) * scale;
     }
 
     /// <summary>
@@ -129,9 +111,9 @@ internal static class Readout
 
         if (prefix != null)
             row.AddChild(TextLabel(prefix, (int)(m.FontSize * scale), Cream, scale));
-        if (style != ReadoutStyle.Card)
+        if (style == ReadoutStyle.Setup)
+        {
             row.AddChild(SetupCaption(m, scale));
-        if (style == ReadoutStyle.SetupBand)
             row.AddChild(new ColorRect
             {
                 Color = Divider,
@@ -139,6 +121,7 @@ internal static class Readout
                 SizeFlagsVertical = Control.SizeFlags.Fill,
                 MouseFilter = Control.MouseFilterEnum.Ignore,
             });
+        }
 
         var icons = new HBoxContainer
         {
@@ -150,7 +133,7 @@ internal static class Readout
             icons.AddChild(Slot(badge, m, scale));
         row.AddChild(icons);
 
-        strip.AddChild(style == ReadoutStyle.SetupDock ? Dock(row, m, scale) : Plate(row, m, scale));
+        strip.AddChild(Plate(row, m, scale));
     }
 
     /// <summary>The square slate plate shared by the card readout and the setup band.</summary>
@@ -174,43 +157,6 @@ internal static class Readout
         plate.AddThemeStyleboxOverride("panel", box);
         plate.AddChild(content);
         return plate;
-    }
-
-    /// <summary>The centered dock: a left-to-right fade under a thin gold rule, no sides.</summary>
-    private static Control Dock(Control content, Metrics m, float scale)
-    {
-        var gradient = new Gradient();
-        gradient.SetColor(0, DockFill);
-        gradient.SetColor(1, DockFillEnd);
-        var box = new StyleBoxTexture
-        {
-            Texture = new GradientTexture2D
-            {
-                Gradient = gradient,
-                Width = 64,
-                Height = 4,
-                FillFrom = new Vector2(0f, 0.5f),
-                FillTo = new Vector2(1f, 0.5f),
-            },
-            ContentMarginLeft = m.PadLeft * scale,
-            ContentMarginTop = m.PadTop * scale,
-            ContentMarginRight = m.PadRight * scale,
-            ContentMarginBottom = m.PadBottom * scale,
-        };
-        var strip = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        strip.AddThemeStyleboxOverride("panel", box);
-        strip.AddChild(content);
-
-        var column = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
-        column.AddThemeConstantOverride("separation", 0);
-        column.AddChild(new ColorRect
-        {
-            Color = DockRule,
-            CustomMinimumSize = new Vector2(0f, Math.Max(1f, DockRuleHeight * scale)),
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-        });
-        column.AddChild(strip);
-        return column;
     }
 
     private static MegaLabel SetupCaption(Metrics m, float scale)

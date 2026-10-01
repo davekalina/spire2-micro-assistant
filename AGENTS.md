@@ -108,17 +108,16 @@ slashed will-NOT End Turn badges instead of showing them; **Setup Relics Bar**
 Tuning Fork, Iron Club, Joss Paper, Pendulum, both Happy Flowers, Pollinous Core
 — the `Persistent` registry flag, matching the game's `[SavedProperty]`
 counters), always on while enabled; **Setup Relics Top Left** (**defaults OFF**)
-makes it the design's left *band* at the relic bar's left edge, and off it is the
-centered *dock*. Either way its top hangs just under the relic bar's last row
+moves it to the relic bar's left edge; off, it is centered. Both placements draw
+the same SETUP plate (the design's left *band*; its centered *dock* variant is
+deliberately unused). Either way its top hangs just under the relic bar's last row
 (`NRelicInventory.GetBottomOfInventory`, re-placed on the bar's `SortChildren`,
 below the co-op player list when there is one) at relative z, and the
-"Will trigger:" banner drops below the dock when they would touch; **Pending Block** (**defaults ON**) shows the "+N" shield.
+"Will trigger:" banner drops below the centered bar when they would touch; **Pending Block** (**defaults ON**) shows the "+N" shield.
 
 The slider governs the mod's **own** panels directly — the focused card's
 display, the setup bar, and the "Will trigger:" banner. At 1.0 the card readout
-and setup bar are exactly the design's sizes, except that the centered dock is
-drawn at the left band's sizes (44px icons, 20pt SETUP) — the design's own dock
-sizes read too small in game. **Scale Always On** extends it to the surfaces that ride native UI:
+and setup bar are exactly the design's sizes. **Scale Always On** extends it to the surfaces that ride native UI:
 unfocused hand strips and the End Turn badges. A change to the setup bar's scale
 must move the top panel's stacking shift with it, or the two overlap.
 

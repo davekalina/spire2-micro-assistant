@@ -454,8 +454,7 @@ internal sealed class CombatOverlayView : IDisposable
 
     /// <summary>
     /// The always-on setup bar: the run-persistent relics, whose counters carry
-    /// between combats, labelled SETUP. Top left it is the design's band, a plate
-    /// under the relic bar; centered it is the lighter dock strip.
+    /// between combats, on the design's SETUP plate in either placement.
     /// </summary>
     private void RefreshSetupPanel()
     {
@@ -466,18 +465,15 @@ internal sealed class CombatOverlayView : IDisposable
                 ? CountingTracker.ForSetup(_player)
                 : [];
         PlaceSetupPanel();
-        Readout.Set(_setupPanel, badges, SetupStyle(), ViewOptions.Scale);
+        Readout.Set(_setupPanel, badges, ReadoutStyle.Setup, ViewOptions.Scale);
         _setupPanel.Visible = badges.Count > 0;
-        // Only the centered dock can reach down to the card panel's slot.
+        // Only the centered bar can reach down to the card panel's slot.
         _setupVisible = badges.Count > 0 && !ViewOptions.SetupTopLeft;
     }
 
-    private static ReadoutStyle SetupStyle() =>
-        ViewOptions.SetupTopLeft ? ReadoutStyle.SetupBand : ReadoutStyle.SetupDock;
-
     /// <summary>
     /// Where the setup bar sits: its top edge just under the relic bar's last row
-    /// either way (a wrapped bar spans the screen, so a centered dock at a fixed y
+    /// either way (a wrapped bar spans the screen, so a centered bar at a fixed y
     /// would sit on its second row). Top left it starts at the bar's left edge and
     /// grows right; centered it spans the screen and centers. Relative z, so the
     /// relic bar's own hover tips still draw over it.
@@ -486,7 +482,7 @@ internal sealed class CombatOverlayView : IDisposable
     {
         if (_setupPanel == null || !GodotObject.IsInstanceValid(_setupPanel))
             return;
-        var height = Readout.Height(SetupStyle(), ViewOptions.Scale);
+        var height = Readout.Height(ReadoutStyle.Setup, ViewOptions.Scale);
         var corner = UnderRelicBar() ?? SetupFallbackCorner;
         var topLeft = ViewOptions.SetupTopLeft;
         _setupPanel.Alignment = topLeft
@@ -851,7 +847,7 @@ internal sealed class CombatOverlayView : IDisposable
     private void SizeTopPanel(float height)
     {
         var half = height / 2f;
-        // Drop below the centered setup dock when the two would touch; the dock
+        // Drop below the centered setup bar when the two would touch; the bar
         // hangs from the relic bar, so its bottom moves with the bar's rows.
         var shift = _setupVisible
             ? Math.Max(0f, _setupBottom + PanelGap - (TopPanelAnchorY * _ui.Size.Y - half))
