@@ -1,37 +1,9 @@
 # Micro Assistant
 
-An informational Slay the Spire 2 mod that shows how your counting relics and
-powers react to what you are about to do.
-
-- Hover or controller-focus a card in hand, and the sources that care about playing
-  it appear above the card — with their current count, or X-ed out if playing the
-  card would break their condition (a fourth card under Pocketwatch, an attack
-  under Art of War) or miss their window (a card past Echo Form's doublings). The
-  row stays with the card while you drag it out and play it — and once the card is
-  held for play, counts turn aqua and show what each counter is **about to
-  become** (Tuning Fork at 5 reads 6; Pen Nib at 9 reads 0 as it fires), and if
-  the play will set something off, a bold **"Triggers"** banner with the icons
-  appears near the top of the screen.
-- Above the End Turn button, sources for which ending the turn is the decision show
-  a will/will-NOT verdict: Pocketwatch, Art of War, Ripple Basin, Orichalcum,
-  Pendulum and the other turn tickers, Pael's Eye, Pale Blue Dot. Hovering a badge
-  shows a native tooltip spelling it out — "Will draw 3 extra cards next turn." or
-  "Will NOT".
-
-An optional always-on **setup bar** lists the run-persistent relics — the ones
-whose counters carry between combats — so you can see where they stand before
-hovering anything.
-
-An upper-right panel on the combat screen (under the version/seed block) offers
-live experimental view switches: Big & Bold, Always On, Card Overlay, Replace
-Card Count, and Replace End Turn Button.
-
-Counts are read from the same values the game's own UI prints, so the two never
-disagree. Nothing about the game's behavior changes.
-
-Covers 32 relics and 11 powers; the full list is in `AGENTS.md`. Adding another
-source is one registry entry in `MicroAssistantCode/CountingTracker.cs`. The gear
-menu reports how many of the current run's relics and powers are being tracked.
+An informational Slay the Spire 2 mod that shows how your relics and powers react to
+what you are about to do. Small readouts appear over the card you are about to play, by
+the End Turn button, and at the top of the screen. Nothing about the game's behavior
+changes.
 
 ## Build
 
