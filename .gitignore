@@ -9,7 +9,7 @@ publish/
 # Machine-specific build configuration (copy Directory.Build.props.example)
 Directory.Build.props
 
-# Staged Workshop upload payload; regenerate with scripts/package-workshop.ps1.
+# Staged Workshop upload payload; regenerate with scripts/package-workshop.sh.
 # workshop/mod_id.txt is deliberately NOT ignored: it is the only link between
 # this repository and the published Steam Workshop item.
 workshop/content/

@@ -87,7 +87,8 @@ Launching with `-nomods` skips mod initialization entirely.
 ## Steam Workshop publishing
 
 Use Mega Crit's uploader: <https://github.com/megacrit/sts2-mod-uploader> (releases ship
-`ModUploader-win-x64.zip` and friends). It operates on a *workspace* directory:
+`ModUploader-win-x64.zip`, `ModUploader-osx-arm64.zip`, and friends; the macOS
+binary is plain `ModUploader`). It operates on a *workspace* directory:
 
 ```text
 workshop/
@@ -131,14 +132,17 @@ to send Mega Crit when reporting an upload problem.
 ## Development loop
 
 1. Reference the installed `sts2.dll` and `0Harmony.dll` from
-   `<game>/data_sts2_windows_x86_64/`. `Sts2PathDiscovery.props` resolves that path from
-   the Steam registry keys, with per-machine overrides in `Directory.Build.props`.
+   `<game>/data_sts2_windows_x86_64/` (on macOS,
+   `<game>/SlayTheSpire2.app/Contents/Resources/data_sts2_macos_*/`, with mods installed to
+   `<game>/SlayTheSpire2.app/Contents/MacOS/mods/`). `Sts2PathDiscovery.props` resolves
+   that path from the Steam registry keys or the platform's default Steam library, with
+   per-machine overrides in `Directory.Build.props`.
 2. Inspect the exact classes and signatures in the *installed* build with ILSpy before
    writing a patch. The game is in Early Access; internals move between releases.
 3. Build. The csproj copies `<id>.json`, `<id>.dll`, and `<id>.pdb` into
    `<game>/mods/<id>/` automatically.
 4. Launch with mods enabled and check the log for the initializer line.
-5. Package with `scripts/package-workshop.ps1` and publish with the uploader.
+5. Package with `scripts/package-workshop.sh` and publish with the uploader.
 
 ## Reference links
 

@@ -270,7 +270,7 @@ The `workshop/` directory is this mod's uploader workspace. See
 - `workshop/mod_id.txt` is created by the uploader on the first publish and must
   be committed. Losing it orphans the published item and the next upload creates
   a duplicate.
-- Stage uploads with `scripts/package-workshop.ps1`. It rebuilds Release and
+- Stage uploads with `scripts/package-workshop.sh`. It rebuilds Release and
   populates `workshop/content/`. Do not hand-copy files, and do not ship the
   `.pdb`.
 - Fill in `changeNote` in `workshop/workshop.json` before every update; it is

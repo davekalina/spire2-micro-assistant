@@ -24,13 +24,15 @@ logs `Micro Assistant v0.1.0 initialized`.
 
 ## Publish to the Steam Workshop
 
-```powershell
-.\scripts\package-workshop.ps1
+```bash
+scripts/package-workshop.sh
 ```
 
-That stages `workshop/content/` and prints the `ModUploader.exe upload -w …` command to
-run next. Get the uploader from
-<https://github.com/megacrit/sts2-mod-uploader/releases>.
+That stages `workshop/content/` and prints the `ModUploader upload -w …` command to
+run next (set `MOD_UPLOADER` to the uploader's path to have it printed in full). Get
+the uploader for your platform from
+<https://github.com/megacrit/sts2-mod-uploader/releases>. On Windows, run the script
+from Git Bash or WSL.
 
 `workshop/mod_id.txt` appears after the first upload. **Commit it** — it is the only link
 between this repository and the published Workshop item.
