@@ -816,10 +816,11 @@ internal sealed class CombatOverlayView : IDisposable
     /// <summary>
     /// The top-center panel: under Show Up Top it carries the active card's full
     /// badge row (never showing the card number — that context is worthless up
-    /// there) whenever a card is focused or in play; otherwise it is the trigger
-    /// banner — the setup bar's plate captioned TRIGGERS — carrying what a play in
-    /// progress will set off. Both take the scale slider, so neither can look out
-    /// of place beside the setup bar sharing the slot.
+    /// there) whenever a card is focused or in play; otherwise it carries the
+    /// TRIGGERS and BREAKS banners side by side — the setup bar's plate, captioned —
+    /// for what a play in progress will set off and which payoffs it will cancel.
+    /// All take the scale slider, so none can look out of place beside the setup
+    /// bar sharing the slot.
     /// </summary>
     private void UpdateTopPanel(NHandCardHolder? inPlay)
     {
@@ -836,19 +837,23 @@ internal sealed class CombatOverlayView : IDisposable
         if (!ViewOptions.ShowUpTop)
         {
             SizeTopPanel(Readout.Height(ReadoutStyle.Trigger, scale));
+            var played = card != null && inPlay != null
+                ? CountingTracker.ForCardPlay(card.Owner, card, projected: true)
+                : [];
             // The sources themselves are the news here; a counter's projected value
             // at the moment it fires (Kunai wrapping to 0) says nothing, so only an
             // amount of Block keeps its number.
-            var triggering = card != null && inPlay != null
-                ? CountingTracker.ForCardPlay(card.Owner, card, projected: true)
-                    .Where(badge => badge.WillTrigger)
-                    .Select(badge => badge.BlockValue
-                        ? badge with { Projected = false, Primed = false }
-                        : badge with { CountText = null })
-                    .ToList()
-                : [];
-            Readout.Set(_topPanel, triggering, ReadoutStyle.Trigger, scale);
-            _topPanel.Visible = triggering.Count > 0;
+            var triggering = played
+                .Where(badge => badge.WillTrigger)
+                .Select(badge => badge.BlockValue
+                    ? badge with { Projected = false, Primed = false }
+                    : badge with { CountText = null })
+                .ToList();
+            // Beside it, the payoffs this play cancels — not the spent allowances
+            // that merely give this play nothing.
+            var breaking = played.Where(badge => badge.CostsPayoff).ToList();
+            _topPanel.Visible = Readout.SetBands(_topPanel, scale,
+                (triggering, ReadoutStyle.Trigger), (breaking, ReadoutStyle.Breaks));
             return;
         }
 

@@ -24,12 +24,15 @@ internal sealed record BadgeTip(string Title, string Body);
 /// whose source fires on (or applies its effect to) this very play — the trigger
 /// banner is built from these. Tip is set only on End Turn badges; hand badges
 /// must not catch the mouse. BlockValue marks a count that is an amount of Block,
-/// which the card readout prints in the Block blue.
+/// which the card readout prints in the Block blue. CostsPayoff marks a Broken
+/// badge whose play cancels the source's payoff (Pocketwatch's draw, Orichalcum's
+/// Block) — the BREAKS banner is built from these — as against one whose play just
+/// gets nothing from a spent source (Echo Form, Music Box).
 /// </summary>
 internal sealed record SourceBadge(
     Texture2D Icon, string Id, string? CountText, bool Broken, bool Primed,
     bool Projected = false, bool WillTrigger = false, BadgeTip? Tip = null,
-    bool BlockValue = false);
+    bool BlockValue = false, bool CostsPayoff = false);
 
 /// <summary>
 /// Which counting sources — relics and powers — care about a card play or about
@@ -60,7 +63,8 @@ internal static class CountingTracker
         bool Persistent = false,
         Func<RelicModel, PlayAhead?, int>? PendingBlock = null,
         bool CountIsBlock = false,
-        Func<RelicModel, CardModel, BlockGain>? PlayBlock = null);
+        Func<RelicModel, CardModel, BlockGain>? PlayBlock = null,
+        bool BreakCostsPayoff = false);
 
     private sealed record PowerSemantics(
         Func<PowerModel, Player, CardModel, CardPlayEffect> PlayEffect,
@@ -97,6 +101,7 @@ internal static class CountingTracker
 
         // Pocketwatch counts every card played this turn; DisplayAmount is that count.
         [typeof(Pocketwatch)] = new(
+            BreakCostsPayoff: true,
             PlayEffect: (relic, _) =>
                 CountingRules.PocketwatchPlay(relic.DisplayAmount, IntVar(relic, "CardThreshold")),
             EndTurn: relic =>
@@ -134,6 +139,7 @@ internal static class CountingTracker
 
         // Art of War: playing no attacks earns energy at the start of next turn.
         [typeof(ArtOfWar)] = new(
+            BreakCostsPayoff: true,
             PlayEffect: (relic, card) => CountingRules.AvoidancePlay(
                 card.Type == CardType.Attack,
                 payoffIntact: !CombatQueries.AnyAttackPlayedThisTurn(relic.Owner)),
@@ -149,6 +155,7 @@ internal static class CountingTracker
 
         // Ripple Basin: playing no attacks grants Block when the turn ends.
         [typeof(RippleBasin)] = new(
+            BreakCostsPayoff: true,
             PlayEffect: (relic, card) => CountingRules.AvoidancePlay(
                 card.Type == CardType.Attack,
                 payoffIntact: !CombatQueries.AnyAttackPlayedThisTurn(relic.Owner)),
@@ -173,6 +180,7 @@ internal static class CountingTracker
         // spend the last of it — for an X-cost card that is any card, since
         // GetAmountToSpend reports the whole pool for those.
         [typeof(PaelsTears)] = new(
+            BreakCostsPayoff: true,
             PlayEffect: (relic, card) => CountingRules.TearsPlay(
                 card.EnergyCost.GetAmountToSpend(), Energy(relic)),
             EndTurn: relic => CountingRules.TearsEndTurn(Energy(relic)),
@@ -187,6 +195,7 @@ internal static class CountingTracker
         // Pael's Eye: a zero-card turn exhausts the hand and grants an extra turn,
         // once per combat. Its Status is Active exactly while that is still live.
         [typeof(PaelsEye)] = new(
+            BreakCostsPayoff: true,
             PlayEffect: (relic, _) =>
                 CountingRules.PaelsEyePlay(relic.Status == RelicStatus.Active),
             EndTurn: relic =>
@@ -586,7 +595,8 @@ internal static class CountingTracker
                 Primed: next == null && semantics.Primed(relic),
                 Projected: next != null,
                 WillTrigger: willTrigger,
-                BlockValue: semantics.CountIsBlock));
+                BlockValue: semantics.CountIsBlock,
+                CostsPayoff: effect == CardPlayEffect.Breaks && semantics.BreakCostsPayoff));
         }
         foreach (var (power, semantics) in TrackedPowerPairs(player))
         {
@@ -790,6 +800,7 @@ internal static class CountingTracker
             : null);
 
     private static RelicSemantics OrichalcumEntry() => new(
+        BreakCostsPayoff: true,
         PlayEffect: (relic, card) => CountingRules.OrichalcumPlay(
             card.GainsBlock, payoffIntact: relic.Owner.Creature.Block == 0),
         EndTurn: relic => CountingRules.OrichalcumEndTurn(relic.Owner.Creature.Block),

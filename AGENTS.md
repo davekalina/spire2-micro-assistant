@@ -130,11 +130,11 @@ the same SETUP plate (the design's left *band*; its centered *dock* variant is
 deliberately unused). Either way its top hangs just under the relic bar's last row
 (`NRelicInventory.GetBottomOfInventory`, re-placed on the bar's `SortChildren`,
 below the co-op player list when there is one) at relative z, and the
-TRIGGERS banner drops below the centered bar when they would touch; **Pending Block** (**defaults ON**) shows the "+N" shield.
+TRIGGERS/BREAKS row drops below the centered bar when they would touch; **Pending Block** (**defaults ON**) shows the "+N" shield.
 
 The slider governs the mod's **own** panels directly — the focused card's
-display, the setup bar, and the TRIGGERS banner. At 1.0 the card readout,
-setup bar, and TRIGGERS banner are exactly the design's sizes. **Scale Always On** extends it to the surfaces that ride native UI:
+display, the setup bar, and the TRIGGERS and BREAKS banners. At 1.0 the card
+readout, setup bar, and banners are exactly the design's sizes. **Scale Always On** extends it to the surfaces that ride native UI:
 unfocused hand strips and the End Turn badges. A change to the setup bar's scale
 must move the top panel's stacking shift with it, or the two overlap.
 
@@ -163,10 +163,16 @@ Any directional change must be applied across all of these:
   to aqua projected counts and the flip back on cancel, and the in-play absolute
   z that keeps badges above the targeting arrow (relative z on plain hover so
   overlay screens still cover the strip);
-- the TRIGGERS banner (top-center at 20% down the screen; the setup bar's plate
-  with TRIGGERS for its caption; visible only while a play in progress will fire
-  a source: primed counters, armed first-X sources, active allowances, Block on
-  play — bare icons, except Block amounts, which keep their number);
+- the TRIGGERS and BREAKS banners, side by side in one centered row (top-center
+  at 20% down the screen; the setup bar's plate under each caption). TRIGGERS
+  shows while a play in progress will fire a source: primed counters, armed
+  first-X sources, active allowances, Block on play — bare icons, except Block
+  amounts, which keep their number. BREAKS shows while the play will cancel a
+  payoff (`CostsPayoff`: Pocketwatch over its limit, Art of War or Ripple Basin
+  on an attack, Pael's Tears on the last energy, Pael's Eye on any card,
+  Orichalcum on Block) — each icon under the slash; spent allowances and
+  first-X sources that merely give the play nothing are not breaks. Either
+  shows alone when the other is empty;
 - the setup bar in both placements: centered, stacking with the top panel (both
   on, either alone, at every slider scale); top left, under one, two, and three
   relic rows, following the bar as a relic is gained mid-combat, and below the
@@ -181,8 +187,8 @@ Any directional change must be applied across all of these:
 - the card readout and the setup bar (`Readout`, built to the "Micro Assistant
   Final" Claude Design spec: the slate plate, SETUP label, count offsets, Block
   counts in #8CD9EC, the negated icon under the loss-red slash). Bands are sized
-  by `Readout.Height`; the TRIGGERS banner is `ReadoutStyle.Trigger`, the setup
-  band under its own caption;
+  by `Readout.Height`; the TRIGGERS and BREAKS banners are `ReadoutStyle.Trigger`
+  and `ReadoutStyle.Breaks`, the setup band under their own captions;
 - the badge strip above the End Turn button (active, X-ed out, hidden states; enemy
   turn, when the strip rides the button's slide-out tween);
 - the hover tips on End Turn badges (will / will NOT wording, counts read from the

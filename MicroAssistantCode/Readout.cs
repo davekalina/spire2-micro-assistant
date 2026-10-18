@@ -18,6 +18,12 @@ internal enum ReadoutStyle
     /// for its caption — the sources a play in progress is about to set off.
     /// </summary>
     Trigger,
+
+    /// <summary>
+    /// The trigger banner's partner, beside it: "BREAKS" and the sources whose
+    /// payoff a play in progress is about to cancel, each under the slash.
+    /// </summary>
+    Breaks,
 }
 
 /// <summary>
@@ -26,7 +32,7 @@ internal enum ReadoutStyle
 /// 1920x1080 and scale 1; the scale slider multiplies all of them together, so a
 /// panel keeps its proportions at any size. The setup bar is the design's left
 /// band in both placements — its centered "dock" variant is deliberately unused —
-/// and the trigger banner wears the same band under its own caption.
+/// and the TRIGGERS and BREAKS banners wear the same band under their own captions.
 ///
 /// The plate is the design system's popup surface: a square, near-opaque slate
 /// band with a steel hairline and a deep drop shadow. Counts are Kreon bold in
@@ -60,6 +66,10 @@ internal static class Readout
 
     private const string SetupLabel = "SETUP";
     private const string TriggerLabel = "TRIGGERS";
+    private const string BreaksLabel = "BREAKS";
+
+    /// <summary>The gap between bands set side by side (TRIGGERS and BREAKS).</summary>
+    private const float BandGap = 16f;
 
     private sealed record Metrics(
         float Icon, float Gap, int FontSize, float BadgeRight, float BadgeRightWide,
@@ -98,14 +108,40 @@ internal static class Readout
         HBoxContainer strip, IReadOnlyList<SourceBadge> badges, ReadoutStyle style,
         float scale, string? prefix = null)
     {
+        Clear(strip);
+        if (badges.Count > 0)
+            strip.AddChild(Band(badges, style, scale, prefix));
+    }
+
+    /// <summary>
+    /// Replace the strip's content with several bands side by side, BandGap apart;
+    /// a band with no badges is left out. Returns whether any band was drawn.
+    /// </summary>
+    public static bool SetBands(
+        HBoxContainer strip, float scale,
+        params (IReadOnlyList<SourceBadge> Badges, ReadoutStyle Style)[] bands)
+    {
+        Clear(strip);
+        strip.AddThemeConstantOverride("separation", (int)(BandGap * scale));
+        foreach (var (badges, style) in bands)
+            if (badges.Count > 0)
+                strip.AddChild(Band(badges, style, scale));
+        return strip.GetChildCount() > 0;
+    }
+
+    private static void Clear(HBoxContainer strip)
+    {
         foreach (var child in strip.GetChildren())
         {
             strip.RemoveChild(child);
             child.QueueFree();
         }
-        if (badges.Count == 0)
-            return;
+    }
 
+    /// <summary>One plated band: caption and divider for the captioned styles, then the icons.</summary>
+    private static Control Band(
+        IReadOnlyList<SourceBadge> badges, ReadoutStyle style, float scale, string? prefix = null)
+    {
         var m = For(style);
         var row = new HBoxContainer
         {
@@ -121,8 +157,12 @@ internal static class Readout
             row.AddChild(TextLabel(prefix, (int)(m.FontSize * scale), Cream, scale));
         if (style != ReadoutStyle.Card)
         {
-            row.AddChild(Caption(
-                style == ReadoutStyle.Trigger ? TriggerLabel : SetupLabel, m, scale));
+            row.AddChild(Caption(style switch
+            {
+                ReadoutStyle.Trigger => TriggerLabel,
+                ReadoutStyle.Breaks => BreaksLabel,
+                _ => SetupLabel,
+            }, m, scale));
             row.AddChild(new ColorRect
             {
                 Color = Divider,
@@ -142,7 +182,7 @@ internal static class Readout
             icons.AddChild(Slot(badge, m, scale));
         row.AddChild(icons);
 
-        strip.AddChild(Plate(row, m, scale));
+        return Plate(row, m, scale);
     }
 
     /// <summary>The square slate plate shared by the card readout and the captioned bands.</summary>
