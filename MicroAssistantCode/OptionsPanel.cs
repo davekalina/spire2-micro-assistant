@@ -140,12 +140,17 @@ internal sealed class OptionsPanel : IDisposable
         _dropdown.Visible = false;
         // Block click-through to whatever sits behind the open list.
         _dropdown.MouseFilter = Control.MouseFilterEnum.Stop;
+        // Pinned by its top-right corner and sized to its rows: a zero-size box that
+        // grows left and down, so a longer row (the byline) widens it into the
+        // screen instead of pushing its right edge off it.
         _dropdown.AnchorLeft = 1f;
         _dropdown.AnchorRight = 1f;
-        _dropdown.OffsetLeft = -352f;
+        _dropdown.OffsetLeft = -12f;
         _dropdown.OffsetRight = -12f;
         _dropdown.OffsetTop = 134f;
-        _dropdown.OffsetBottom = 536f;
+        _dropdown.OffsetBottom = 134f;
+        _dropdown.GrowHorizontal = Control.GrowDirection.Begin;
+        _dropdown.GrowVertical = Control.GrowDirection.End;
         _root.AddChild(_dropdown);
 
         parent.AddChild(_root);
