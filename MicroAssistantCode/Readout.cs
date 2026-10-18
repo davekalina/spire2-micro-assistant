@@ -12,6 +12,12 @@ internal enum ReadoutStyle
 
     /// <summary>The setup bar, wherever it is placed: plate, "SETUP", divider.</summary>
     Setup,
+
+    /// <summary>
+    /// The trigger banner: the setup bar's plate and proportions with "TRIGGERS"
+    /// for its caption — the sources a play in progress is about to set off.
+    /// </summary>
+    Trigger,
 }
 
 /// <summary>
@@ -19,7 +25,8 @@ internal enum ReadoutStyle
 /// (Claude Design, spire-mod design system). Every number below is that spec at
 /// 1920x1080 and scale 1; the scale slider multiplies all of them together, so a
 /// panel keeps its proportions at any size. The setup bar is the design's left
-/// band in both placements — its centered "dock" variant is deliberately unused.
+/// band in both placements — its centered "dock" variant is deliberately unused —
+/// and the trigger banner wears the same band under its own caption.
 ///
 /// The plate is the design system's popup surface: a square, near-opaque slate
 /// band with a steel hairline and a deep drop shadow. Counts are Kreon bold in
@@ -52,6 +59,7 @@ internal static class Readout
     private const float NegatedGrayscale = 0.2f;
 
     private const string SetupLabel = "SETUP";
+    private const string TriggerLabel = "TRIGGERS";
 
     private sealed record Metrics(
         float Icon, float Gap, int FontSize, float BadgeRight, float BadgeRightWide,
@@ -68,7 +76,7 @@ internal static class Readout
         LabelFontSize: 20, LabelGap: 20f);
 
     private static Metrics For(ReadoutStyle style) =>
-        style == ReadoutStyle.Setup ? SetupMetrics : CardMetrics;
+        style == ReadoutStyle.Card ? CardMetrics : SetupMetrics;
 
     /// <summary>
     /// The panel's full height at this scale: icon row, padding, and the plate's
@@ -111,9 +119,10 @@ internal static class Readout
 
         if (prefix != null)
             row.AddChild(TextLabel(prefix, (int)(m.FontSize * scale), Cream, scale));
-        if (style == ReadoutStyle.Setup)
+        if (style != ReadoutStyle.Card)
         {
-            row.AddChild(SetupCaption(m, scale));
+            row.AddChild(Caption(
+                style == ReadoutStyle.Trigger ? TriggerLabel : SetupLabel, m, scale));
             row.AddChild(new ColorRect
             {
                 Color = Divider,
@@ -136,7 +145,7 @@ internal static class Readout
         strip.AddChild(Plate(row, m, scale));
     }
 
-    /// <summary>The square slate plate shared by the card readout and the setup band.</summary>
+    /// <summary>The square slate plate shared by the card readout and the captioned bands.</summary>
     private static Control Plate(Control content, Metrics m, float scale)
     {
         var border = PlateBorderWidth * scale;
@@ -159,9 +168,9 @@ internal static class Readout
         return plate;
     }
 
-    private static MegaLabel SetupCaption(Metrics m, float scale)
+    private static MegaLabel Caption(string text, Metrics m, float scale)
     {
-        var caption = TextLabel(SetupLabel, (int)(m.LabelFontSize * scale), Gold, scale);
+        var caption = TextLabel(text, (int)(m.LabelFontSize * scale), Gold, scale);
         // The design's 1.5px tracking on uppercase Kreon.
         caption.AddThemeConstantOverride("letter_spacing", (int)Math.Round(1.5f * scale));
         return caption;

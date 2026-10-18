@@ -104,10 +104,6 @@ internal sealed class CombatOverlayView : IDisposable
     private static readonly Color BlockLabelOutline = new(0.042f, 0.3318f, 0.42f);
     private static readonly Color PendingBlockCount = new("8CD9EC");
 
-    // The "Will trigger:" banner's caption. Not a game string, so not localized —
-    // the same as this mod's hover-tip bodies and the setup bar's SETUP label.
-    private const string TriggerTitle = "Will trigger:";
-
     private readonly NCombatUi _ui;
     private readonly List<RelicModel> _subscribedRelics = [];
     private readonly Dictionary<NHandCardHolder, HBoxContainer> _handStrips = [];
@@ -158,7 +154,7 @@ internal sealed class CombatOverlayView : IDisposable
         // Full-width so its centered content needs no measuring; only visible while
         // a card is focused or in play, which is also why its absolute z (over the
         // targeting arrow) is safe to leave on permanently.
-        _topPanel = BadgeStrip.CreateTriggerBanner("MicroAssistantTopPanel");
+        _topPanel = BadgeStrip.CreatePanel("MicroAssistantTopPanel");
         _topPanel.AnchorLeft = 0f;
         _topPanel.AnchorRight = 1f;
         _topPanel.AnchorTop = TopPanelAnchorY;
@@ -169,7 +165,7 @@ internal sealed class CombatOverlayView : IDisposable
 
         // The setup bar shares the top panel's home and takes the upper slot; the
         // card panel drops below it when both are up.
-        _setupPanel = BadgeStrip.CreateTriggerBanner("MicroAssistantSetupPanel");
+        _setupPanel = BadgeStrip.CreatePanel("MicroAssistantSetupPanel");
         _setupPanel.AnchorLeft = 0f;
         _setupPanel.AnchorRight = 1f;
         _setupPanel.AnchorTop = TopPanelAnchorY;
@@ -442,15 +438,6 @@ internal sealed class CombatOverlayView : IDisposable
             NPlayerHand.Instance?.IsInCardSelection ?? false),
         false);
 
-    /// <summary>
-    /// The band a backed panel needs: only the icon row and the caption scale — the
-    /// tooltip backing's content insets are fixed — so it is row (+ caption) plus
-    /// insets, never a flat multiple.
-    /// </summary>
-    private static float PanelHeight(float scale, bool titled) =>
-        BadgeRowHeight * scale +
-        (titled ? BadgeStrip.TitleRowHeight * scale : 0f) +
-        BackingInsets;
 
     /// <summary>
     /// The always-on setup bar: the run-persistent relics, whose counters carry
@@ -825,10 +812,10 @@ internal sealed class CombatOverlayView : IDisposable
     /// <summary>
     /// The top-center panel: under Show Up Top it carries the active card's full
     /// badge row (never showing the card number — that context is worthless up
-    /// there) whenever a card is focused or in play; otherwise it is the
-    /// "Will trigger:" banner, the icons of what a play in progress will set off.
-    /// Both take the scale slider, so neither can look out of place beside the
-    /// setup bar sharing the slot.
+    /// there) whenever a card is focused or in play; otherwise it is the trigger
+    /// banner — the setup bar's plate captioned TRIGGERS — carrying what a play in
+    /// progress will set off. Both take the scale slider, so neither can look out
+    /// of place beside the setup bar sharing the slot.
     /// </summary>
     private void UpdateTopPanel(NHandCardHolder? inPlay)
     {
@@ -844,12 +831,20 @@ internal sealed class CombatOverlayView : IDisposable
         var scale = ViewOptions.Scale;
         if (!ViewOptions.ShowUpTop)
         {
-            SizeTopPanel(PanelHeight(scale, titled: true));
+            SizeTopPanel(Readout.Height(ReadoutStyle.Trigger, scale));
+            // The sources themselves are the news here; a counter's projected value
+            // at the moment it fires (Kunai wrapping to 0) says nothing, so only an
+            // amount of Block keeps its number.
             var triggering = card != null && inPlay != null
                 ? CountingTracker.ForCardPlay(card.Owner, card, projected: true)
-                    .Where(badge => badge.WillTrigger).ToList()
+                    .Where(badge => badge.WillTrigger)
+                    .Select(badge => badge.BlockValue
+                        ? badge with { Projected = false, Primed = false }
+                        : badge with { CountText = null })
+                    .ToList()
                 : [];
-            BadgeStrip.SetTriggerIcons(_topPanel, triggering, scale, TriggerTitle);
+            Readout.Set(_topPanel, triggering, ReadoutStyle.Trigger, scale);
+            _topPanel.Visible = triggering.Count > 0;
             return;
         }
 
