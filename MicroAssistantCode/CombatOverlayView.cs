@@ -14,6 +14,7 @@ using MegaCrit.Sts2.Core.Nodes.Screens.Map;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
+using MegaCrit.Sts2.Core.Saves;
 using MegaCrit.Sts2.addons.mega_text;
 
 namespace MicroAssistant.MicroAssistantCode;
@@ -38,7 +39,8 @@ internal sealed class CombatOverlayView : IDisposable
     // - CardOverlay: centered on Hypergeo's proven on-art band (center y -88).
     // - ReplaceCardCount: dropped onto the digit's own spot — the band's bottom
     //   matches the digit's so nothing peeks out — which the strip absorbs as a
-    //   "N. " prefix while the digit itself is hidden.
+    //   "N. " prefix while the digit itself is hidden. Only while the game's own
+    //   "Show Hand Card Count" is on; with it off there is no digit to absorb.
     // Bands scale with the badge scale (Big & Bold): the fixed edge stays put and
     // the band grows away from the card. Only the icon row scales — the tooltip
     // backing's content insets are fixed — so the band is row + insets, not a
@@ -108,6 +110,7 @@ internal sealed class CombatOverlayView : IDisposable
     private readonly List<RelicModel> _subscribedRelics = [];
     private readonly Dictionary<NHandCardHolder, HBoxContainer> _handStrips = [];
     private readonly Dictionary<NHandCardHolder, Label> _hiddenIndexLabels = [];
+    private bool _replacingCardCount = ReplacesCardCount();
     private readonly OptionsPanel _options = new();
     private HBoxContainer? _endTurnStrip;
     private HBoxContainer? _endTurnExtension;
@@ -320,6 +323,7 @@ internal sealed class CombatOverlayView : IDisposable
         Guard.Run("Applying changed view options", () =>
         {
             RestoreIndexLabels();
+            _replacingCardCount = ReplacesCardCount();
             RefreshEndTurn();
             SyncHandStrips();
         });
@@ -793,7 +797,7 @@ internal sealed class CombatOverlayView : IDisposable
         var height = Readout.Height(ReadoutStyle.Card, scale);
         var (top, bottom) = ViewOptions.CardOverlay
             ? (OverlayCenter - height / 2f, OverlayCenter + height / 2f)
-            : ViewOptions.ReplaceCardCount
+            : ReplacesCardCount()
                 ? (ReplaceCountBottom - height, ReplaceCountBottom)
                 : (HandStripBottom - height, HandStripBottom);
         strip.OffsetTop = top;
@@ -806,7 +810,7 @@ internal sealed class CombatOverlayView : IDisposable
             ? CountingTracker.ForCardPlay(card.Owner, card, projected)
             : [];
         Readout.Set(strip, badges, ReadoutStyle.Card, scale, CountPrefix(holder));
-        SyncIndexLabel(holder, hide: ViewOptions.ReplaceCardCount && badges.Count > 0);
+        SyncIndexLabel(holder, hide: ReplacesCardCount() && badges.Count > 0);
     }
 
     /// <summary>
@@ -882,10 +886,22 @@ internal sealed class CombatOverlayView : IDisposable
             $"{trackedPowers} of {_player.Creature.Powers.Count} powers";
     }
 
+    /// <summary>
+    /// Whether Replace Card Count is in effect: the switch is on and the game's own
+    /// "Show Hand Card Count" setting is too. A player who turned the number off
+    /// gets no number from this mod either, and the strip keeps its default spot.
+    /// </summary>
+    private static bool ReplacesCardCount() =>
+        ViewOptions.ReplaceCardCount && GameShowsCardCount();
+
+    /// <summary>The game's "Show Hand Card Count", as NHandCardHolder.SetIndexLabel reads it.</summary>
+    private static bool GameShowsCardCount() =>
+        SaveManager.Instance?.PrefsSave?.ShowCardIndices ?? false;
+
     /// <summary>The native hand-count digit, absorbed as a "N. " strip prefix.</summary>
     private string? CountPrefix(NHandCardHolder holder)
     {
-        if (!ViewOptions.ReplaceCardCount || !GodotObject.IsInstanceValid(holder))
+        if (!ReplacesCardCount() || !GodotObject.IsInstanceValid(holder))
             return null;
         var label = holder.GetNodeOrNull<Label>("%HandIndex");
         return label != null && label.Text.Length > 0 ? $"{label.Text}. " : null;
@@ -893,11 +909,22 @@ internal sealed class CombatOverlayView : IDisposable
 
     /// <summary>
     /// The game's SetIndexLabel just re-showed a digit this view absorbed; hide it
-    /// again. Called from the patch, so it must stay cheap.
+    /// again. Called from the patch, so it must stay cheap. The game's settings
+    /// tickbox relays the hand out through here too, so this is also where a
+    /// mid-combat flip of "Show Hand Card Count" is caught: the strips are rebuilt
+    /// once, when the effective state changes.
     /// </summary>
     public void ReassertIndexHidden(NHandCardHolder holder)
     {
-        if (!ViewOptions.ReplaceCardCount)
+        var replacing = ReplacesCardCount();
+        if (replacing != _replacingCardCount)
+        {
+            _replacingCardCount = replacing;
+            RestoreIndexLabels();
+            SyncHandStrips();
+            return;
+        }
+        if (!replacing)
             return;
         if (_hiddenIndexLabels.TryGetValue(holder, out var label) &&
             GodotObject.IsInstanceValid(label))
@@ -930,16 +957,24 @@ internal sealed class CombatOverlayView : IDisposable
     {
         if (_hiddenIndexLabels.Remove(holder, out var label) &&
             GodotObject.IsInstanceValid(label))
-            label.Visible = true;
+            label.Visible = NativeIndexVisible(label);
     }
 
     private void RestoreIndexLabels()
     {
         foreach (var label in _hiddenIndexLabels.Values)
             if (GodotObject.IsInstanceValid(label))
-                label.Visible = true;
+                label.Visible = NativeIndexVisible(label);
         _hiddenIndexLabels.Clear();
     }
+
+    /// <summary>
+    /// What the game itself would show for a digit: SetIndexLabel's own rule — a
+    /// positive index, and the player's "Show Hand Card Count" on — so handing a
+    /// digit back never shows one the player turned off.
+    /// </summary>
+    private static bool NativeIndexVisible(Label label) =>
+        GameShowsCardCount() && int.TryParse(label.Text, out var index) && index > 0;
 
     /// <summary>
     /// The holder of the card play in progress, if any. It is reparented onto the

@@ -148,7 +148,9 @@ above the button's click region (a cell over the button would swallow presses): 
 **Always On** (every hand card carries its strip), **Card Overlay** (strip on the
 card art, unbacked, at Hypergeo's proven on-art band), **Replace Card Count** (the
 native hand digit hides and the strip absorbs it as a "N." prefix, dropping onto
-the digit's spot), **Replace End Turn Button** (End Turn badges render as a flush
+the digit's spot — only while the game's own "Show Hand Card Count" setting,
+`PrefsSave.ShowCardIndices`, is on; with it off the switch changes nothing, and a
+digit handed back follows the game's own rule), **Replace End Turn Button** (End Turn badges render as a flush
 backed extension on the button's top edge instead of floating above it).
 
 Any directional change must be applied across all of these:
@@ -201,7 +203,9 @@ Any directional change must be applied across all of these:
 - every view switch in every combination (the options compose: placement comes
   from Card Overlay > Replace Card Count > default; Big & Bold moves the focused
   display; Always On multiplies strips), plus flipping a switch mid-combat and
-  restoring the hidden hand digits when Replace Card Count turns off.
+  restoring the hidden hand digits when Replace Card Count turns off — or when
+  the game's "Show Hand Card Count" is turned off mid-combat, which must leave
+  no digit and no "N." prefix behind.
 
 ## Mod UI: match the game
 
