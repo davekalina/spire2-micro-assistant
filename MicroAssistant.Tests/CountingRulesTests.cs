@@ -186,6 +186,29 @@ public class CountingRulesTests
         Assert.Equal(expected,
             CountingRules.PendingBlockGain(CountingRules.OrichalcumEndTurn(block), amount: 6));
 
+    // The pending-Block preview: a card bringing Block cancels Orichalcum too.
+    [Theory]
+    [InlineData(0, false, EndTurnState.Active)]
+    [InlineData(0, true, EndTurnState.Broken)]
+    [InlineData(3, false, EndTurnState.Broken)]
+    [InlineData(3, true, EndTurnState.Broken)]
+    public void Orichalcum_end_turn_after_play(int block, bool blockComing, EndTurnState expected) =>
+        Assert.Equal(expected, CountingRules.OrichalcumEndTurn(block, blockComing));
+
+    [Theory]
+    [InlineData(5, false, 5)]
+    [InlineData(5, true, 4)]
+    [InlineData(0, true, 0)]
+    public void Hand_after_play(int hand, bool playing, int expected) =>
+        Assert.Equal(expected, CountingRules.HandAfterPlay(hand, playing));
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(1, 1)]
+    [InlineData(7, 1)]
+    public void One_if_any(int candidates, int expected) =>
+        Assert.Equal(expected, CountingRules.OneIfAny(candidates));
+
     [Theory]
     [InlineData(EndTurnState.Active, 4, 4)]
     [InlineData(EndTurnState.Broken, 4, 0)]

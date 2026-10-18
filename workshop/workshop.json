@@ -2,7 +2,7 @@
   "title": "Micro Assistant",
   "description": "Shows which counting relics and powers each card play affects - on the hovered card, and above the End Turn button.",
   "visibility": "unlisted",
-  "changeNote": "v0.17.2: The Setup Relics bar now uses the same SETUP panel whether it is centered or in the upper left. v0.17.1: The card readout and the Setup Relics bar have a new look. The Setup bar sits top-center by default, just under the relic bar however many rows it wraps to, and Setup Relics Top Left in the options menu moves it to the upper left. New pending-Block shield beside your Block shows what ending the turn will add (Orichalcum, Fake Orichalcum, Ripple Basin, Cloak Clasp, Plating, Frost orbs); Orichalcum drops out as soon as you have any Block. Badge scale now defaults to 1.0.",
+  "changeNote": "v0.19.0: Block-on-play powers are now tracked. Child of the Stars, Pillar of Creation, Afterimage, Rage, Danse Macabre, Spirit of Ash, and Shroud badge the cards that would trigger them with the Block that play brings, and Feel No Pain's badge now shows the total Block for that card. The pending-Block shield beside your Block now previews the card you are hovering: it adds the Block that playing it sets off (including Ornamental Fan, Tuning Fork, Permafrost, and Intimidating Helmet) and drops Orichalcum or Ripple Basin if the card would cancel them. Feel No Pain's Block from Ethereal cards exhausting at turn end is included too. The options menu now ends with a byline.",
   "tags": [],
   "dependencies": [],
   "contentDescriptors": []

@@ -115,6 +115,27 @@ internal sealed class OptionsPanel : IDisposable
         AddToggle(rows, "Hide Negated Payoffs",
             () => ViewOptions.HideNegatedPayoffs, v => ViewOptions.HideNegatedPayoffs = v);
 
+        // The byline closes the menu, as in the other mods' panels.
+        rows.AddChild(new Control
+        {
+            CustomMinimumSize = new Vector2(0f, 6f),
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+        });
+        var byline = new MegaLabel
+        {
+            Text = $"{MainFile.ModName} {MainFile.Version} by {MainFile.Author}",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            MouseFilter = Control.MouseFilterEnum.Ignore,
+            AutoSizeEnabled = false,
+            Modulate = new Color(1f, 1f, 1f, 0.75f),
+        };
+        byline.AddThemeFontOverride("font", ResourceLoader.Load<Font>(FontPath));
+        byline.AddThemeFontSizeOverride("font_size", 15);
+        byline.AddThemeColorOverride("font_color", StsColors.gold);
+        byline.AddThemeColorOverride("font_outline_color", new Color(0.12f, 0.10208f, 0.0816f));
+        byline.AddThemeConstantOverride("outline_size", 6);
+        rows.AddChild(byline);
+
         _dropdown = BadgeStrip.BackedPanel(rows);
         _dropdown.Visible = false;
         // Block click-through to whatever sits behind the open list.
@@ -124,7 +145,7 @@ internal sealed class OptionsPanel : IDisposable
         _dropdown.OffsetLeft = -352f;
         _dropdown.OffsetRight = -12f;
         _dropdown.OffsetTop = 134f;
-        _dropdown.OffsetBottom = 508f;
+        _dropdown.OffsetBottom = 536f;
         _root.AddChild(_dropdown);
 
         parent.AddChild(_root);

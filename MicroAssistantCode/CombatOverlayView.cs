@@ -524,16 +524,18 @@ internal sealed class CombatOverlayView : IDisposable
 
     /// <summary>
     /// The pending-Block shield: what ending the turn now would add to the player's
-    /// Block, as "+N" beside the native Block shield. Only during the player's own
-    /// play phase; once End Turn is pressed the real Block is arriving. Parented to
-    /// the player's health bar, so it rides the creature and hides with the bar.
+    /// Block, as "+N" beside the native Block shield — and, while a hand card is
+    /// focused or held for play, the Block that playing it sets off first. Only
+    /// during the player's own play phase; once End Turn is pressed the real Block
+    /// is arriving. Parented to the player's health bar, so it rides the creature
+    /// and hides with the bar.
     /// </summary>
     private void RefreshPendingBlock()
     {
         var amount = ViewOptions.ShowPendingBlock && _player != null &&
             CombatManager.Instance.IsInProgress && !ShouldStandDown() &&
             _player.PlayerCombatState?.Phase == PlayerTurnPhase.Play
-                ? CountingTracker.PendingEndTurnBlock(_player)
+                ? CountingTracker.PendingBlock(_player, ActiveCard())
                 : 0;
         var healthBar = amount > 0 ? PlayerHealthBar() : null;
         var native = healthBar?.GetNodeOrNull<Control>("%BlockContainer");
@@ -760,6 +762,21 @@ internal sealed class CombatOverlayView : IDisposable
             RefreshHolderStrip(holder, projected: holder == inPlay);
 
         UpdateTopPanel(inPlay);
+        RefreshPendingBlock();
+    }
+
+    /// <summary>
+    /// The hand card the pending shield previews: the one held for play, else the
+    /// focused one — only while it can actually be played, so hovering a Wound or
+    /// an unaffordable card does not promise Block. Null when the display stands down.
+    /// </summary>
+    private static CardModel? ActiveCard()
+    {
+        if (!CombatManager.Instance.IsInProgress || ShouldStandDown())
+            return null;
+        var holder = InPlayHolder() ?? NPlayerHand.Instance?.FocusedHolder;
+        var card = holder != null && GodotObject.IsInstanceValid(holder) ? holder.CardModel : null;
+        return card != null && card.CanPlay() ? card : null;
     }
 
     private void RefreshHolderStrip(NHandCardHolder holder, bool projected)

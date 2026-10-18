@@ -157,8 +157,12 @@ public static class CountingRules
     public static CardPlayEffect OrichalcumPlay(bool cardGainsBlock, bool payoffIntact) =>
         cardGainsBlock && payoffIntact ? CardPlayEffect.Breaks : CardPlayEffect.None;
 
-    public static EndTurnState OrichalcumEndTurn(int currentBlock) =>
-        currentBlock == 0 ? EndTurnState.Active : EndTurnState.Broken;
+    /// <param name="blockComing">
+    /// The pending-Block preview's card play brings Block of its own, which is up
+    /// before Orichalcum checks.
+    /// </param>
+    public static EndTurnState OrichalcumEndTurn(int currentBlock, bool blockComing = false) =>
+        currentBlock == 0 && !blockComing ? EndTurnState.Active : EndTurnState.Broken;
 
     /// <summary>
     /// What an end-of-turn block source adds to the pending Block: its amount while
@@ -167,6 +171,16 @@ public static class CountingRules
     /// </summary>
     public static int PendingBlockGain(EndTurnState state, int amount) =>
         state == EndTurnState.Active ? Math.Max(0, amount) : 0;
+
+    /// <summary>The hand left at turn end once a card being previewed has been played.</summary>
+    public static int HandAfterPlay(int handCount, bool playing) =>
+        Math.Max(0, handCount - (playing ? 1 : 0));
+
+    /// <summary>
+    /// A card effect that picks one card out of some candidates — chosen or random
+    /// alike — touches exactly one while any exist.
+    /// </summary>
+    public static int OneIfAny(int candidates) => candidates > 0 ? 1 : 0;
 
     /// <summary>
     /// Allowance powers (Echo Form, Void Form, ...): the first N matching plays each

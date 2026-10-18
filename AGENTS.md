@@ -31,11 +31,19 @@ is about to do, on three surfaces during combat:
   decision — will/will-NOT verdicts with native hover tips.
 - **Beside the player's Block shield**: a translucent "+N" shield just left of the
   native one, carrying the Block that ending the turn now would grant
-  (`CountingTracker.PendingEndTurnBlock`: each registry entry's `PendingBlock` —
-  Orichalcum, Fake Orichalcum, Ripple Basin, Cloak Clasp, Plating — plus every
-  Frost orb passive, each gain passed through `Hook.ModifyBlock` as the card
-  previews do). Orichalcum drops out the moment any Block is up, because it
-  checks Block in its very-early turn-end hook, before any other source grants.
+  (`CountingTracker.PendingBlock`: each registry entry's `PendingBlock` —
+  Orichalcum, Fake Orichalcum, Ripple Basin, Cloak Clasp, Plating, Feel No Pain
+  on the Ethereal cards that will exhaust — plus every Frost orb passive, each
+  gain passed through `Hook.ModifyBlock` as the card previews do). Orichalcum
+  drops out the moment any Block is up, because it checks Block in its
+  very-early turn-end hook, before any other source grants. While a playable
+  hand card is focused or held for play, the shield previews playing it first:
+  each entry's `PlayBlock` (the Block-on-play powers below, plus Ornamental Fan
+  and Tuning Fork when primed, Permafrost while armed, Intimidating Helmet) is
+  added, and the end-of-turn sources read the turn as it will stand afterwards
+  — the card gone from the hand (Cloak Clasp, Ethereal), an attack losing Ripple
+  Basin, any Block it brings cancelling Orichalcum. The card's own printed Block
+  is not added; the card already shows it.
 
 Covered sources (one registry entry each in `CountingTracker`): relics —
 Pocketwatch, Pendulum, Pen Nib, Nunchaku, Kunai, Shuriken, Ornamental Fan,
@@ -49,20 +57,27 @@ it is about to grant), Paper Phrog (attacks while any enemy is Vulnerable),
 Intimidating Helmet (cards currently costing 2+ energy);
 powers — Echo Form, Void Form, Nostalgia,
 Unmovable, Lethality, Phantom Blades, Juggling, Pale Blue Dot, Panache,
-Plating (End Turn badge carrying the Block about to be granted), and Feel No
-Pain (badge on anything that exhausts, carrying the Block per exhaust).
+Plating (End Turn badge carrying the Block about to be granted), and the
+Block-on-play powers, whose card badge carries the Block that play brings:
+Feel No Pain (per card exhausted, self or others; End Turn badge for Ethereal
+cards in hand), Child of the Stars (per star spent), Pillar of Creation (per
+card generated), Afterimage (every card), Rage (attacks), Danse Macabre (cards
+costing 2+), Spirit of Ash (Ethereal cards), Shroud (per Doom application).
 Deliberately excluded: Unsettling Lamp (a card's "applies a debuff to an enemy" is
 only decidable at play time), locks and end-turn reversals (the game communicates
 them), Make It So / Normality / FTL.
 
-**`ExhaustingCards` is the one hand-maintained card list in this mod.** Exhaust
-the *keyword* only ever means "this card exhausts itself"; a card that exhausts
-*other* cards decides that inside its own effects, with no keyword or tag to
-test, so `CountingTracker.ExhaustingCards` names the card models that call
-`CardCmd.Exhaust`. It is the one thing here that a game update can silently make
-wrong — a new exhausting card just will not be reminded about. Re-derive it with
-`grep -rl "CardCmd.Exhaust" decompiled/sts2/MegaCrit/sts2/Core/Models/Cards/`
-when checking the mod against a new game version.
+**`CardTable` is the one hand-maintained card table in this mod.** Exhaust the
+*keyword* only ever means "this card exhausts itself"; how many *other* cards a
+card exhausts (Feel No Pain), how many cards it generates for combat (Pillar of
+Creation), and how many Doom applications it makes (Shroud) are decided inside
+each card's own effects, with no keyword or tag to test. So
+`CountingTracker.CardTable` names those card models, each with its count read
+off the card before play. It is the one thing here that a game update can
+silently make wrong — a new card just will not be counted. Re-derive it against
+a new game version by grepping the decompiled `Models/Cards/` for
+`CardCmd.Exhaust`; for `AddGeneratedCard`, `CardCmd.Transform`,
+`Shiv.CreateInHand`, and `ForgeCmd.Forge`; and for `Apply<DoomPower>`.
 
 The layering that must not regress silently:
 
@@ -90,6 +105,8 @@ The layering that must not regress silently:
 
 The gear menu's first row is a status line — "Tracking X of N relics, Y of M
 powers" — refreshed each open, so a badge-less run is diagnosable at a glance.
+Its last row is the byline, "Micro Assistant <version> by realtruegravy", as in
+the other mods' panels.
 **Nothing this mod shows is persisted.** `ViewOptions` is plain statics — no
 config file, no BaseLib registry, no player prefs — so every launch starts at
 the defaults in that class and there is no stored state a "reset" could clear.
@@ -152,8 +169,12 @@ Any directional change must be applied across all of these:
   relic rows, following the bar as a relic is gained mid-combat, and below the
   co-op player list;
 - the pending-Block shield (zero Block, Block up cancelling Orichalcum, Cloak
-  Clasp moving with hand size, Frost orbs with Focus and Gold-Plated Cables, gone
-  once End Turn is pressed and on enemy turns);
+  Clasp moving with hand size, Frost orbs with Focus and Gold-Plated Cables,
+  Ethereal cards under Feel No Pain, gone once End Turn is pressed and on enemy
+  turns; hovering, controller-focusing, and holding a card adds its play Block —
+  Pillar of Creation on a Shiv card, Child of the Stars on a star cost — and a
+  block card or an attack drops Orichalcum or Ripple Basin; an unplayable card
+  previews nothing);
 - the card readout and the setup bar (`Readout`, built to the "Micro Assistant
   Final" Claude Design spec: the slate plate, SETUP label, count offsets, Block
   counts in #8CD9EC, the negated icon under the loss-red slash). Bands are sized

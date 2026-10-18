@@ -5,6 +5,7 @@ using MegaCrit.Sts2.Core.Entities.Relics;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Cards;
+using MegaCrit.Sts2.Core.Models.Events;
 using MegaCrit.Sts2.Core.Models.Orbs;
 using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Models.Relics;
@@ -57,8 +58,9 @@ internal static class CountingTracker
         Func<RelicModel, EndTurnState, BadgeTip?> EndTurnTip,
         Func<RelicModel, CardModel, string?>? NextCount = null,
         bool Persistent = false,
-        Func<RelicModel, int>? PendingBlock = null,
-        bool CountIsBlock = false);
+        Func<RelicModel, PlayAhead?, int>? PendingBlock = null,
+        bool CountIsBlock = false,
+        Func<RelicModel, CardModel, BlockGain>? PlayBlock = null);
 
     private sealed record PowerSemantics(
         Func<PowerModel, Player, CardModel, CardPlayEffect> PlayEffect,
@@ -68,8 +70,26 @@ internal static class CountingTracker
         Func<PowerModel, Player, EndTurnState, BadgeTip?> EndTurnTip,
         Func<PowerModel, Player, string>? NextCount = null,
         bool TriggersWhileContributing = false,
-        Func<PowerModel, Player, int>? PendingBlock = null,
-        bool CountIsBlock = false);
+        Func<PowerModel, Player, PlayAhead?, int>? PendingBlock = null,
+        bool CountIsBlock = false,
+        Func<PowerModel, Player, CardModel, BlockGain>? PlayBlock = null);
+
+    /// <summary>
+    /// Block a source grants because one card is played: <see cref="Times" /> gains
+    /// of <see cref="Each" />, each passed through Hook.ModifyBlock the way the
+    /// game passes each CreatureCmd.GainBlock.
+    /// </summary>
+    private readonly record struct BlockGain(decimal Each, int Times)
+    {
+        public bool Any => Each > 0 && Times > 0;
+    }
+
+    /// <summary>
+    /// The card play the pending-Block shield is previewing. End-of-turn sources
+    /// read the turn as if it had already happened: the card has left the hand,
+    /// and any Block it brings is up before Orichalcum looks.
+    /// </summary>
+    private sealed record PlayAhead(CardModel Card, bool GainsBlock);
 
     private static readonly Dictionary<Type, RelicSemantics> Relics = new()
     {
@@ -141,8 +161,10 @@ internal static class CountingTracker
                 state == EndTurnState.Active
                     ? $"Will gain {IntVar(relic, "Block")} Block when this turn ends."
                     : "Will NOT gain Block this turn."),
-            PendingBlock: relic => CountingRules.PendingBlockGain(
-                CountingRules.AvoidanceEndTurn(!CombatQueries.AnyAttackPlayedThisTurn(relic.Owner)),
+            PendingBlock: (relic, ahead) => CountingRules.PendingBlockGain(
+                CountingRules.AvoidanceEndTurn(
+                    !CombatQueries.AnyAttackPlayedThisTurn(relic.Owner) &&
+                    ahead?.Card.Type != CardType.Attack),
                 IntVar(relic, "Block")),
             CountIsBlock: true),
 
@@ -195,10 +217,10 @@ internal static class CountingTracker
         [typeof(Nunchaku)] = AttackTicker(persistent: true),
         [typeof(Kunai)] = AttackTicker(),
         [typeof(Shuriken)] = AttackTicker(),
-        [typeof(OrnamentalFan)] = AttackTicker(),
+        [typeof(OrnamentalFan)] = AttackTicker(paysBlock: true),
         [typeof(Kusarigama)] = AttackTicker(),
         [typeof(LetterOpener)] = SkillTicker(),
-        [typeof(TuningFork)] = SkillTicker(persistent: true),
+        [typeof(TuningFork)] = SkillTicker(persistent: true, paysBlock: true),
         [typeof(IronClub)] = AnyCardTicker(persistent: true),
 
         // Joss Paper counts exhausted cards. Exhaust-keyword cards advance it on
@@ -268,7 +290,11 @@ internal static class CountingTracker
             EndTurn: _ => EndTurnState.Hidden,
             CountText: _ => null,
             Primed: _ => false,
-            EndTurnTip: (_, _) => null),
+            EndTurnTip: (_, _) => null,
+            PlayBlock: (relic, card) =>
+                card.Type == CardType.Power && !CombatQueries.AnyPowerPlayedThisCombat(relic.Owner)
+                    ? new BlockGain(IntVar(relic, "Block"), 1)
+                    : default),
 
         // Pael's Legion doubles a block card, then cools down; DisplayAmount is the
         // cooldown and drops to -1 once it is ready again.
@@ -377,12 +403,14 @@ internal static class CountingTracker
         // Intimidating Helmet grants Block whenever a card is played with 2+
         // energy actually spent; cards currently costing that much carry its icon.
         [typeof(IntimidatingHelmet)] = new(
-            PlayEffect: (relic, card) => CountingRules.TickerPlay(
-                card.EnergyCost.GetAmountToSpend() >= relic.DynamicVars.Energy.IntValue),
+            PlayEffect: (relic, card) => CountingRules.TickerPlay(HelmetPays(relic, card)),
             EndTurn: _ => EndTurnState.Hidden,
             CountText: _ => null,
             Primed: _ => false,
-            EndTurnTip: (_, _) => null),
+            EndTurnTip: (_, _) => null,
+            PlayBlock: (relic, card) => HelmetPays(relic, card)
+                ? new BlockGain(IntVar(relic, "Block"), 1)
+                : default),
     };
 
     private static readonly Dictionary<Type, PowerSemantics> Powers = new()
@@ -458,20 +486,49 @@ internal static class CountingTracker
             NextCount: (power, _) =>
                 CountingRules.NextDown(power.DisplayAmount).ToString()),
 
-        // Feel No Pain grants Block for every card exhausted, so the reminder has to
-        // cover both halves: a card that exhausts itself on play, and a card whose
-        // own effect exhausts others. The badge carries the Block per exhaust.
-        [typeof(FeelNoPainPower)] = new(
-            PlayEffect: (_, _, card) => CountingRules.TickerPlay(
-                card.Keywords.Contains(CardKeyword.Exhaust) || ExhaustsOtherCards(card)),
-            EndTurn: (_, _) => EndTurnState.Hidden,
-            CountText: (power, _) => power.Amount.ToString(),
-            Primed: (_, _) => false,
-            EndTurnTip: (_, _, _) => null,
-            // Every exhaust pays out, so a contributing card is always a trigger —
-            // there is no Nth-play threshold to wait for.
-            TriggersWhileContributing: true,
-            CountIsBlock: true),
+        // Feel No Pain grants Block for every card exhausted, so the card badge has to
+        // cover both halves — a card that exhausts itself on play, and a card whose
+        // own effect exhausts others — and carries the Block this play brings. The
+        // Ethereal cards still in hand exhaust when the turn ends; that Block rides
+        // the End Turn badge and the pending shield.
+        [typeof(FeelNoPainPower)] = BlockOnPlay(
+            gain: (power, _, card) => new BlockGain(power.Amount, ExhaustsOnPlay(card)),
+            endTurnBlock: (power, player, ahead) =>
+                power.Amount * EtherealAtTurnEnd(player, ahead?.Card),
+            endTurnTip: block => $"Will gain {block} Block as Ethereal cards exhaust " +
+                "when this turn ends."),
+
+        // ---- Block on play ----------------------------------------------------
+
+        // Child of the Stars: Block per star a card spends.
+        [typeof(ChildOfTheStarsPower)] = BlockOnPlay(
+            (power, _, card) => new BlockGain(power.Amount * StarsSpent(card), 1)),
+
+        // Pillar of Creation: Block per card generated for combat.
+        [typeof(PillarOfCreationPower)] = BlockOnPlay(
+            (power, player, card) => new BlockGain(power.Amount, CardsGenerated(player, card))),
+
+        // Afterimage: Block for every card played.
+        [typeof(AfterimagePower)] = BlockOnPlay(
+            (power, _, _) => new BlockGain(power.Amount, 1)),
+
+        // Rage: Block for every attack played this turn.
+        [typeof(RagePower)] = BlockOnPlay(
+            (power, _, card) => new BlockGain(power.Amount, card.Type == CardType.Attack ? 1 : 0)),
+
+        // Danse Macabre: Block for a card costing at least its Energy DynamicVar.
+        [typeof(DanseMacabrePower)] = BlockOnPlay(
+            (power, _, card) => new BlockGain(power.Amount,
+                card.EnergyCost.GetResolved() >= power.DynamicVars.Energy.IntValue ? 1 : 0)),
+
+        // Spirit of Ash: Block for every Ethereal card played.
+        [typeof(SpiritOfAshPower)] = BlockOnPlay(
+            (power, _, card) => new BlockGain(power.Amount,
+                card.Keywords.Contains(CardKeyword.Ethereal) ? 1 : 0)),
+
+        // Shroud: Block every time a Doom application lands.
+        [typeof(ShroudPower)] = BlockOnPlay(
+            (power, _, card) => new BlockGain(power.Amount, DoomApplications(card))),
 
         // Plating grants its stacks as Block when the turn ends, then decays; the
         // End Turn badge is the reminder, carrying the amount about to be granted.
@@ -483,7 +540,7 @@ internal static class CountingTracker
             EndTurnTip: (power, _, _) => new BadgeTip(
                 Title(power),
                 $"Will gain {power.Amount} Block when this turn ends."),
-            PendingBlock: (power, _) => power.Amount,
+            PendingBlock: (power, _, _) => power.Amount,
             CountIsBlock: true),
 
         // Panache: every fifth play hits all enemies; the counter is public via its
@@ -543,10 +600,14 @@ internal static class CountingTracker
                 (semantics.Primed(power, player) ||
                  semantics.CountText(power, player) == null ||
                  semantics.TriggersWhileContributing);
+            // A power that grants Block on play carries the Block this card brings.
+            var playBlock = semantics.PlayBlock is { } gain
+                ? ModifiedBlock(player, gain(power, player, card)).ToString()
+                : null;
             badges.Add(new SourceBadge(
                 power.Icon,
                 power.Id.Entry,
-                next ?? semantics.CountText(power, player),
+                playBlock ?? next ?? semantics.CountText(power, player),
                 Broken: effect == CardPlayEffect.Breaks,
                 Primed: next == null && semantics.Primed(power, player),
                 Projected: next != null,
@@ -613,36 +674,57 @@ internal static class CountingTracker
     }
 
     /// <summary>
-    /// The Block that ending the turn right now would grant: every tracked source
-    /// that is about to fire (Orichalcum, Fake Orichalcum, Ripple Basin, Cloak
-    /// Clasp, Plating) plus each Frost orb's end-of-turn passive, as many times as
-    /// it will trigger. Each gain goes through Hook.ModifyBlock — the same pass the
-    /// game's card previews make — so No Block and future modifiers read right.
+    /// The Block on its way: what ending the turn right now would grant — every
+    /// tracked source about to fire (Orichalcum, Fake Orichalcum, Ripple Basin,
+    /// Cloak Clasp, Plating, Feel No Pain on Ethereal cards) plus each Frost orb's
+    /// end-of-turn passive, as many times as it will trigger.
+    ///
+    /// With <paramref name="card" /> — focused or held for play — it previews
+    /// playing that card first: the Block the play itself sets off (Child of the
+    /// Stars, Pillar of Creation, Feel No Pain, Afterimage, Rage, Danse Macabre,
+    /// Spirit of Ash, Shroud, and the tracked relics that pay Block), then the
+    /// turn end as it would stand afterwards. Each gain goes through
+    /// Hook.ModifyBlock — the same pass the game's card previews make — so No
+    /// Block and future modifiers read right.
     /// </summary>
-    public static int PendingEndTurnBlock(Player player)
+    public static int PendingBlock(Player player, CardModel? card = null)
     {
-        var creature = player.Creature;
-        if (creature.CombatState is not { } state)
+        if (player.Creature.CombatState == null)
             return 0;
-        var gains = new List<decimal>();
+        var gains = new List<BlockGain>();
+        if (card != null)
+        {
+            foreach (var (relic, semantics) in TrackedRelicPairs(player))
+                if (semantics.PlayBlock?.Invoke(relic, card) is { Any: true } gain)
+                    gains.Add(gain);
+            foreach (var (power, semantics) in TrackedPowerPairs(player))
+                if (semantics.PlayBlock?.Invoke(power, player, card) is { Any: true } gain)
+                    gains.Add(gain);
+        }
+        var ahead = card != null ? new PlayAhead(card, card.GainsBlock || gains.Count > 0) : null;
         foreach (var (relic, semantics) in TrackedRelicPairs(player))
-            if (semantics.PendingBlock?.Invoke(relic) is > 0 and var amount)
-                gains.Add(amount);
+            if (semantics.PendingBlock?.Invoke(relic, ahead) is > 0 and var amount)
+                gains.Add(new BlockGain(amount, 1));
         foreach (var (power, semantics) in TrackedPowerPairs(player))
-            if (semantics.PendingBlock?.Invoke(power, player) is > 0 and var amount)
-                gains.Add(amount);
+            if (semantics.PendingBlock?.Invoke(power, player, ahead) is > 0 and var amount)
+                gains.Add(new BlockGain(amount, 1));
         // Frost orbs: OrbModel.TriggerPassive's own count (Gold-Plated Cables adds
         // one for the front orb); the passive value already carries Focus.
+        var state = player.Creature.CombatState;
         foreach (var orb in player.PlayerCombatState?.OrbQueue.Orbs ?? [])
-        {
-            if (orb is not FrostOrb)
-                continue;
-            var triggers = Hook.ModifyOrbPassiveTriggerCount(state, orb, 1, out _);
-            for (var i = 0; i < triggers; i++)
-                gains.Add(orb.PassiveVal);
-        }
-        return gains.Sum(gain => (int)Hook.ModifyBlock(
-            state, creature, gain, ValueProp.Unpowered, null, null, out _));
+            if (orb is FrostOrb)
+                gains.Add(new BlockGain(
+                    orb.PassiveVal, Hook.ModifyOrbPassiveTriggerCount(state, orb, 1, out _)));
+        return gains.Sum(gain => ModifiedBlock(player, gain));
+    }
+
+    /// <summary>A gain's Block after Hook.ModifyBlock, once per CreatureCmd.GainBlock.</summary>
+    private static int ModifiedBlock(Player player, BlockGain gain)
+    {
+        if (!gain.Any || player.Creature.CombatState is not { } state)
+            return 0;
+        return gain.Times * (int)Hook.ModifyBlock(
+            state, player.Creature, gain.Each, ValueProp.Unpowered, null, null, out _);
     }
 
     /// <summary>The player's relics this mod understands, for event subscription.</summary>
@@ -675,21 +757,23 @@ internal static class CountingTracker
 
     // ---- Entry builders -------------------------------------------------------
 
-    private static RelicSemantics AttackTicker(bool persistent = false) =>
-        Ticker(card => card.Type == CardType.Attack, persistent);
+    private static RelicSemantics AttackTicker(bool persistent = false, bool paysBlock = false) =>
+        Ticker(card => card.Type == CardType.Attack, persistent, paysBlock);
 
-    private static RelicSemantics SkillTicker(bool persistent = false) =>
-        Ticker(card => card.Type == CardType.Skill, persistent);
+    private static RelicSemantics SkillTicker(bool persistent = false, bool paysBlock = false) =>
+        Ticker(card => card.Type == CardType.Skill, persistent, paysBlock);
 
     private static RelicSemantics AnyCardTicker(bool persistent = false) =>
         Ticker(_ => true, persistent);
 
     /// <summary>
     /// Every-Nth relics whose DisplayAmount is the wrapped count and whose threshold
-    /// is their Cards DynamicVar.
+    /// is their Cards DynamicVar. <paramref name="paysBlock" />: the payoff is the
+    /// relic's Block DynamicVar (Ornamental Fan, Tuning Fork), granted on the play
+    /// that fires it.
     /// </summary>
     private static RelicSemantics Ticker(
-        Func<CardModel, bool> matches, bool persistent = false) => new(
+        Func<CardModel, bool> matches, bool persistent = false, bool paysBlock = false) => new(
         PlayEffect: (_, card) => CountingRules.TickerPlay(matches(card)),
         EndTurn: _ => EndTurnState.Hidden,
         CountText: relic => relic.DisplayAmount.ToString(),
@@ -697,7 +781,13 @@ internal static class CountingTracker
         EndTurnTip: (_, _) => null,
         NextCount: (relic, _) =>
             CountingRules.NextWrapped(relic.DisplayAmount, Cards(relic)).ToString(),
-        Persistent: persistent);
+        Persistent: persistent,
+        PlayBlock: paysBlock
+            ? (relic, card) =>
+                matches(card) && CountingRules.IsPrimed(relic.DisplayAmount, Cards(relic))
+                    ? new BlockGain(IntVar(relic, "Block"), 1)
+                    : default
+            : null);
 
     private static RelicSemantics OrichalcumEntry() => new(
         PlayEffect: (relic, card) => CountingRules.OrichalcumPlay(
@@ -711,9 +801,11 @@ internal static class CountingTracker
                 ? $"Will gain {IntVar(relic, "Block")} Block when this turn ends."
                 : "Will NOT gain Block this turn."),
         // Orichalcum reads the Block before anything else at turn end grants any
-        // (its very-early hook), so only Block already up now cancels it.
-        PendingBlock: relic => CountingRules.PendingBlockGain(
-            CountingRules.OrichalcumEndTurn(relic.Owner.Creature.Block),
+        // (its very-early hook), so only Block already up now — or brought by the
+        // card being previewed — cancels it.
+        PendingBlock: (relic, ahead) => CountingRules.PendingBlockGain(
+            CountingRules.OrichalcumEndTurn(
+                relic.Owner.Creature.Block, blockComing: ahead?.GainsBlock ?? false),
             IntVar(relic, "Block")),
         CountIsBlock: true);
 
@@ -745,6 +837,32 @@ internal static class CountingTracker
         Primed: (_, _) => false,
         EndTurnTip: (_, _, _) => null);
 
+    /// <summary>
+    /// Powers that grant Block as a card is played: the badge rides every card that
+    /// would set one off, carrying the Block that play brings, and the pending
+    /// shield adds it. <paramref name="endTurnBlock" /> also puts the power above
+    /// End Turn whenever ending the turn would grant some.
+    /// </summary>
+    private static PowerSemantics BlockOnPlay(
+        Func<PowerModel, Player, CardModel, BlockGain> gain,
+        Func<PowerModel, Player, PlayAhead?, int>? endTurnBlock = null,
+        Func<int, string>? endTurnTip = null) => new(
+        PlayEffect: (power, player, card) =>
+            CountingRules.TickerPlay(gain(power, player, card).Any),
+        EndTurn: (power, player) => endTurnBlock?.Invoke(power, player, null) > 0
+            ? EndTurnState.Active
+            : EndTurnState.Hidden,
+        CountText: (power, player) => endTurnBlock?.Invoke(power, player, null).ToString(),
+        Primed: (_, _) => false,
+        EndTurnTip: (power, player, _) => endTurnBlock != null && endTurnTip != null
+            ? new BadgeTip(Title(power), endTurnTip(endTurnBlock(power, player, null)))
+            : null,
+        // Every matching play pays out; there is no threshold to wait for.
+        TriggersWhileContributing: true,
+        PendingBlock: endTurnBlock,
+        CountIsBlock: true,
+        PlayBlock: gain);
+
     // ---- Model reads ----------------------------------------------------------
 
     private static int RainbowTypesFilled(Player player)
@@ -756,31 +874,220 @@ internal static class CountingTracker
         return filled;
     }
 
-    private static int CloakClaspBlock(RelicModel relic) =>
-        (relic.Owner.PlayerCombatState?.Hand.Cards.Count ?? 0) * IntVar(relic, "Block");
+    /// <summary>Cloak Clasp's Block for the hand left at turn end, less a card being played.</summary>
+    private static int CloakClaspBlock(RelicModel relic, PlayAhead? ahead = null) =>
+        CountingRules.HandAfterPlay(
+            relic.Owner.PlayerCombatState?.Hand.Cards.Count ?? 0, playing: ahead != null) *
+        IntVar(relic, "Block");
+
+    /// <summary>Intimidating Helmet pays on 2+ energy actually spent (cardPlay.Resources).</summary>
+    private static bool HelmetPays(RelicModel relic, CardModel card) =>
+        card.EnergyCost.GetAmountToSpend() >= relic.DynamicVars.Energy.IntValue;
+
+    /// <summary>
+    /// The Ethereal cards that will exhaust when the turn ends, as CombatManager's
+    /// DoTurnEnd picks them — minus a card about to be played out of the hand.
+    /// </summary>
+    private static int EtherealAtTurnEnd(Player player, CardModel? playing)
+    {
+        if (player.Creature.CombatState is not { } state)
+            return 0;
+        return player.PlayerCombatState?.Hand.Cards.Count(card =>
+            card != playing &&
+            card.Keywords.Contains(CardKeyword.Ethereal) &&
+            (card.HasTurnEndInHandEffect || Hook.ShouldEtherealTrigger(state, card))) ?? 0;
+    }
+
+    /// <summary>Stars a card spends as it is played, as CardModel.SpendResources reads them.</summary>
+    private static int StarsSpent(CardModel card) =>
+        Math.Max(0, card.GetStarCostWithModifiers());
 
     private static bool AnyEnemyVulnerable(RelicModel relic) =>
         relic.Owner.Creature.CombatState?.HittableEnemies
             .Any(enemy => enemy.HasPower<VulnerablePower>()) ?? false;
 
     /// <summary>
-    /// Cards whose own effect exhausts other cards. There is no keyword or tag for
-    /// this — <see cref="CardKeyword.Exhaust" /> only means "exhausts itself" — and
-    /// the game decides it inside each card's effects, so the set is written out:
-    /// the card models that call <c>CardCmd.Exhaust</c>, as of game 0.111.0. Types
-    /// rather than ids on purpose, so a card that leaves the game breaks the build
-    /// here instead of quietly dropping out of the reminder. A new card that
-    /// exhausts others has to be added here by hand.
+    /// What a card's own effects do that no keyword or tag declares: how many other
+    /// cards it exhausts (Feel No Pain), how many cards it generates for combat
+    /// (Pillar of Creation), and how many Doom applications it makes (Shroud). The
+    /// game decides each inside the card's effects, so the table is written out by
+    /// hand, as of game 0.111.0 — re-derive it by grepping Models/Cards/ for
+    /// <c>CardCmd.Exhaust</c>; for <c>AddGeneratedCard</c>, <c>CardCmd.Transform</c>,
+    /// <c>Shiv.CreateInHand</c>, and <c>ForgeCmd.Forge</c>; and for
+    /// <c>Apply&lt;DoomPower&gt;</c>. Types rather than ids on purpose, so a card that
+    /// leaves the game breaks the build here instead of quietly dropping out. Each
+    /// count is read off the card before it is played. A free choice ("up to N",
+    /// Guards' any number) counts the most the play could do; a skippable
+    /// choose-one counts the one.
     /// </summary>
-    private static readonly HashSet<Type> ExhaustingCards =
-    [
-        typeof(Brand), typeof(BurningPact), typeof(Cinder), typeof(Cleanse),
-        typeof(FiendFire), typeof(FlakCannon), typeof(Purity), typeof(Scavenge),
-        typeof(SecondWind), typeof(Stoke), typeof(Thrash), typeof(TrueGrit),
-    ];
+    private sealed record CardEffects(
+        Func<CardModel, int>? Exhausts = null,
+        Func<CardModel, int>? Generates = null,
+        Func<CardModel, int>? AppliesDoom = null);
 
-    private static bool ExhaustsOtherCards(CardModel card) =>
-        ExhaustingCards.Contains(card.GetType());
+    private static readonly Dictionary<Type, CardEffects> CardTable = new()
+    {
+        // ---- Exhausts other cards ----------------------------------------------
+        [typeof(Brand)] = new(Exhausts: card => CountingRules.OneIfAny(OthersInHand(card).Count())),
+        [typeof(BurningPact)] = new(Exhausts: card => CountingRules.OneIfAny(OthersInHand(card).Count())),
+        [typeof(Cinder)] = new(Exhausts: card => CountingRules.OneIfAny(OthersInHand(card).Count())),
+        [typeof(Cleanse)] = new(Exhausts: card =>
+            CountingRules.OneIfAny(card.Owner.PlayerCombatState?.DrawPile.Cards.Count ?? 0)),
+        [typeof(FiendFire)] = new(Exhausts: card => OthersInHand(card).Count()),
+        [typeof(FlakCannon)] = new(Exhausts: card =>
+            card.Owner.PlayerCombatState?.AllCards.Count(other =>
+                other.Type == CardType.Status && other.Pile?.Type != PileType.Exhaust) ?? 0),
+        [typeof(Purity)] = new(Exhausts: card =>
+            Math.Min(card.DynamicVars.Cards.IntValue, OthersInHand(card).Count())),
+        [typeof(Scavenge)] = new(Exhausts: card => CountingRules.OneIfAny(OthersInHand(card).Count())),
+        [typeof(SecondWind)] = new(Exhausts: card =>
+            OthersInHand(card).Count(other => other.Type != CardType.Attack)),
+        // Stoke exhausts the hand, then generates as many cards as it exhausted.
+        [typeof(Stoke)] = new(
+            Exhausts: card => OthersInHand(card).Count(),
+            Generates: card => OthersInHand(card).Count()),
+        [typeof(Thrash)] = new(Exhausts: card =>
+            CountingRules.OneIfAny(OthersInHand(card).Count(other => other.Type == CardType.Attack))),
+        [typeof(TrueGrit)] = new(Exhausts: card => CountingRules.OneIfAny(OthersInHand(card).Count())),
+
+        // ---- Generates cards for combat ----------------------------------------
+        [typeof(Abundance)] = Generates(1),
+        [typeof(AdaptiveStrike)] = Generates(1),
+        [typeof(Anger)] = Generates(1),
+        [typeof(Begone)] = new(Generates: card => CountingRules.OneIfAny(OthersInHand(card).Count())),
+        [typeof(BladeDance)] = GeneratesCardsVar(),
+        [typeof(BladeOfInk)] = GeneratesCardsVar(),
+        [typeof(BladeSymphony)] = GeneratesCardsVar(),
+        [typeof(BoostAway)] = Generates(1),
+        [typeof(BundleOfJoy)] = GeneratesCardsVar(),
+        [typeof(CaptureSpirit)] = GeneratesCardsVar(),
+        [typeof(Charge)] = new(Generates: card => Math.Min(card.DynamicVars.Cards.IntValue,
+            card.Owner.PlayerCombatState?.DrawPile.Cards.Count ?? 0)),
+        [typeof(CloakAndDagger)] = GeneratesCardsVar(),
+        [typeof(CollisionCourse)] = Generates(1),
+        [typeof(Compact)] = new(Generates: card => OthersInHand(card).Count(other =>
+            other.IsTransformable && other.Type == CardType.Status)),
+        // Crash Landing fills the hand to its cap once this card has left it.
+        [typeof(CrashLanding)] = new(Generates: card =>
+            Math.Max(0, CardPile.MaxCardsInHand - OthersInHand(card).Count())),
+        [typeof(Dirge)] = new(Generates: card => card.CombatState is { } state
+            ? Hook.ModifyXValue(state, card, card.EnergyCost.GetAmountToSpend())
+            : 0),
+        [typeof(Discovery)] = Generates(1),
+        [typeof(Distraction)] = Generates(1),
+        [typeof(DualWield)] = new(Generates: card =>
+            OthersInHand(card).Any(other => other.Type is CardType.Attack or CardType.Power)
+                ? card.DynamicVars.Cards.IntValue
+                : 0),
+        [typeof(FanOfKnives)] = new(Generates: card => card.DynamicVars["Shivs"].IntValue),
+        [typeof(FightThrough)] = Generates(2),
+        [typeof(GlimpseBeyond)] = new(Generates: card =>
+            card.DynamicVars.Cards.IntValue * LivingPlayersOnSide(card)),
+        [typeof(GraveWarden)] = GeneratesCardsVar(),
+        [typeof(Guards)] = new(Generates: card => OthersInHand(card).Count()),
+        [typeof(GunkUp)] = Generates(1),
+        [typeof(HeirloomHammer)] = new(Generates: card =>
+            OthersInHand(card).Any(other => other.VisualCardPool.IsColorless)
+                ? card.DynamicVars.Repeat.IntValue
+                : 0),
+        [typeof(HiddenDaggers)] = new(Generates: card => card.DynamicVars["Shivs"].IntValue),
+        [typeof(InfernalBlade)] = Generates(1),
+        [typeof(JackOfAllTrades)] = GeneratesCardsVar(),
+        [typeof(Jackpot)] = GeneratesCardsVar(),
+        [typeof(Largesse)] = Generates(1),
+        [typeof(LeadingStrike)] = new(Generates: card => card.DynamicVars["Shivs"].IntValue),
+        [typeof(MadScience)] = new(Generates: card =>
+            ((MadScience)card).TinkerTimeRider == TinkerTime.RiderEffect.Chaos ? 1 : 0),
+        [typeof(ManifestAuthority)] = Generates(1),
+        [typeof(Metamorphosis)] = GeneratesCardsVar(),
+        [typeof(Outrage)] = new(Generates: LivingPlayersOnSide),
+        [typeof(Overclock)] = Generates(1),
+        [typeof(PrimalForce)] = new(Generates: card => OthersInHand(card).Count(other =>
+            other.IsTransformable && other.Type == CardType.Attack)),
+        [typeof(Quasar)] = Generates(1),
+        [typeof(Reave)] = GeneratesCardsVar(),
+        [typeof(Seance)] = new(Generates: card => Math.Min(card.DynamicVars.Cards.IntValue,
+            card.Owner.PlayerCombatState?.DrawPile.Cards.Count ?? 0)),
+        [typeof(Severance)] = Generates(3),
+        [typeof(Splash)] = Generates(1),
+        [typeof(StormOfSteel)] = new(Generates: card => OthersInHand(card).Count()),
+        [typeof(Turbo)] = Generates(1),
+        [typeof(Undeath)] = Generates(1),
+        [typeof(UpMySleeve)] = GeneratesCardsVar(),
+        [typeof(WhiteNoise)] = Generates(1),
+        // Forge makes a Sovereign Blade only when the player has none left.
+        [typeof(BeatIntoShape)] = Forges(),
+        [typeof(BigBang)] = Forges(),
+        [typeof(Bulwark)] = Forges(),
+        [typeof(Conqueror)] = Forges(),
+        [typeof(RefineBlade)] = Forges(),
+        [typeof(SeekingEdge)] = Forges(),
+        [typeof(SpoilsOfBattle)] = Forges(),
+        [typeof(SummonForth)] = Forges(),
+        [typeof(TheSmith)] = Forges(),
+        [typeof(WroughtInWar)] = Forges(),
+
+        // ---- Applies Doom ------------------------------------------------------
+        [typeof(BlightStrike)] = new(AppliesDoom: _ => 1),
+        [typeof(NoEscape)] = new(AppliesDoom: _ => 1),
+        [typeof(Scourge)] = new(AppliesDoom: _ => 1),
+        [typeof(Deathbringer)] = new(AppliesDoom: HittableEnemies),
+        [typeof(EndOfDays)] = new(AppliesDoom: HittableEnemies),
+        [typeof(NegativePulse)] = new(AppliesDoom: HittableEnemies),
+    };
+
+    private static CardEffects Generates(int count) => new(Generates: _ => count);
+
+    private static CardEffects GeneratesCardsVar() =>
+        new(Generates: card => card.DynamicVars.Cards.IntValue);
+
+    private static CardEffects Forges() => new(Generates: card =>
+        card.Owner.PlayerCombatState?.AllCards.Any(other =>
+            other is SovereignBlade && !other.IsDupe && other.Pile?.Type != PileType.Exhaust) ?? true
+            ? 0
+            : 1);
+
+    private static IEnumerable<CardModel> OthersInHand(CardModel card) =>
+        card.Owner.PlayerCombatState?.Hand.Cards.Where(other => other != card) ?? [];
+
+    private static int LivingPlayersOnSide(CardModel card) =>
+        card.CombatState?.GetTeammatesOf(card.Owner.Creature)
+            .Count(creature => creature is { IsAlive: true, IsPlayer: true }) ?? 1;
+
+    private static int HittableEnemies(CardModel card) =>
+        card.CombatState?.HittableEnemies.Count ?? 0;
+
+    /// <summary>Cards a play exhausts: itself under the Exhaust keyword, plus its own effect's.</summary>
+    private static int ExhaustsOnPlay(CardModel card) =>
+        (card.Keywords.Contains(CardKeyword.Exhaust) ? 1 : 0) +
+        (CardTable.GetValueOrDefault(card.GetType())?.Exhausts?.Invoke(card) ?? 0);
+
+    /// <summary>
+    /// Cards generated for combat as this card is played, with the player as their
+    /// creator: the card's own effect, plus the tracked clones it sets off — Music
+    /// Box on the turn's first attack, Juggling on the third, Calamity on every one.
+    /// </summary>
+    private static int CardsGenerated(Player player, CardModel card)
+    {
+        var count = CardTable.GetValueOrDefault(card.GetType())?.Generates?.Invoke(card) ?? 0;
+        if (card.Type != CardType.Attack)
+            return count;
+        var attacksBefore = CombatQueries.AttacksStartedThisTurn(player);
+        if (player.Relics.Any(relic => relic is MusicBox { IsMelted: false }) &&
+            !CombatQueries.AnyAttackPlayedThisTurn(player))
+            count++;
+        foreach (var power in player.Creature.Powers)
+        {
+            if (power is JugglingPower && attacksBefore == JugglingThreshold - 1)
+                count += power.Amount;
+            if (power is CalamityPower)
+                count += power.Amount;
+        }
+        return count;
+    }
+
+    private static int DoomApplications(CardModel card) =>
+        CardTable.GetValueOrDefault(card.GetType())?.AppliesDoom?.Invoke(card) ?? 0;
 
     private static int Energy(RelicModel relic) =>
         relic.Owner.PlayerCombatState?.Energy ?? 0;
