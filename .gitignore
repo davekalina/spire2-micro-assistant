@@ -25,3 +25,6 @@ workshop/content/
 .env
 .env.*
 !.env.example
+
+# macOS Finder metadata
+.DS_Store
