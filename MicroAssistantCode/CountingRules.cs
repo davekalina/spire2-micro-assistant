@@ -75,6 +75,14 @@ public static class CountingRules
         cardMatches ? CardPlayEffect.Contributes : CardPlayEffect.None;
 
     /// <summary>
+    /// Galactic Dust pays once per full threshold of Stars spent. One play spends a
+    /// card's whole star cost at once, so it can fire from a count that was never
+    /// one short, and more than once (an X-star card spending 20).
+    /// </summary>
+    public static int StarThresholdsCrossed(int count, int spent, int threshold) =>
+        spent <= 0 ? 0 : (count + spent) / threshold;
+
+    /// <summary>
     /// Brilliant Scarf: the Nth card each turn is free; once the window is spent for
     /// the turn there is nothing left to say.
     /// </summary>
@@ -196,6 +204,13 @@ public static class CountingRules
 
     /// <summary>A wrapped counter after one more tick (Pen Nib at 9 reads 0).</summary>
     public static int NextWrapped(int count, int threshold) => (count + 1) % threshold;
+
+    /// <summary>
+    /// Galactic Dust after a play that spends <paramref name="spent" /> Stars: the
+    /// remainder toward the next threshold (8 + 3 of 10 reads 1).
+    /// </summary>
+    public static int NextStars(int count, int spent, int threshold) =>
+        (count + Math.Max(0, spent)) % threshold;
 
     /// <summary>A count-up counter after one more tick.</summary>
     public static int NextUp(int count) => count + 1;

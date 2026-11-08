@@ -233,6 +233,27 @@ public class CountingRulesTests
     public void Next_wrapped(int count, int threshold, int expected) =>
         Assert.Equal(expected, CountingRules.NextWrapped(count, threshold));
 
+    // Galactic Dust: a play adds its whole star cost, wrapping at the threshold.
+    [Theory]
+    [InlineData(3, 2, 10, 5)]
+    [InlineData(8, 3, 10, 1)]
+    [InlineData(9, 1, 10, 0)]
+    [InlineData(4, 0, 10, 4)]
+    [InlineData(5, 25, 10, 0)]
+    public void Next_stars(int count, int spent, int threshold, int expected) =>
+        Assert.Equal(expected, CountingRules.NextStars(count, spent, threshold));
+
+    // It fires once per full threshold crossed, even from a count that was not
+    // one short; a play spending no Stars never fires it.
+    [Theory]
+    [InlineData(3, 2, 10, 0)]
+    [InlineData(8, 3, 10, 1)]
+    [InlineData(9, 1, 10, 1)]
+    [InlineData(5, 25, 10, 3)]
+    [InlineData(9, 0, 10, 0)]
+    public void Star_thresholds_crossed(int count, int spent, int threshold, int expected) =>
+        Assert.Equal(expected, CountingRules.StarThresholdsCrossed(count, spent, threshold));
+
     [Fact]
     public void Next_up_and_down()
     {

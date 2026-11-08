@@ -39,7 +39,8 @@ is about to do, on three surfaces during combat:
   very-early turn-end hook, before any other source grants. While a playable
   hand card is focused or held for play, the shield previews playing it first:
   each entry's `PlayBlock` (the Block-on-play powers below, plus Ornamental Fan
-  and Tuning Fork when primed, Permafrost while armed, Intimidating Helmet) is
+  and Tuning Fork when primed, Galactic Dust when the card's Stars reach its
+  next ten, Permafrost while armed, Intimidating Helmet) is
   added, and the end-of-turn sources read the turn as it will stand afterwards
   — the card gone from the hand (Cloak Clasp, Ethereal), an attack losing Ripple
   Basin, any Block it brings cancelling Orichalcum. The card's own printed Block
@@ -47,7 +48,9 @@ is about to do, on three surfaces during combat:
 
 Covered sources (one registry entry each in `CountingTracker`): relics —
 Pocketwatch, Pendulum, Pen Nib, Nunchaku, Kunai, Shuriken, Ornamental Fan,
-Kusarigama, Letter Opener, Tuning Fork, Iron Club, Brilliant Scarf, Velvet Choker,
+Kusarigama, Letter Opener, Tuning Fork, Iron Club, Galactic Dust (star-cost cards
+advance it by their Stars and trigger it when they reach the next ten), Brilliant
+Scarf, Velvet Choker,
 Art of War, Ripple Basin, Pael's Tears, Pael's Eye, Rainbow Ring, Happy Flower, Fake Happy
 Flower, Pollinous Core, Stone Calendar, Music Box, Vambrace, Permafrost, Pael's
 Legion, Orichalcum, Fake Orichalcum, Joss Paper (Exhaust cards advance it;
@@ -121,8 +124,9 @@ a **badge scale slider** (0.5–3.0 in 0.05 steps, **defaulting to 1.0**; replac
 the Big & Bold toggle, which was scale 2.0) plus ten switches — Replace Card
 Count defaults ON, it won its audition; **Hide Negated Payoffs** drops the
 slashed will-NOT End Turn badges instead of showing them; **Setup Relics Bar**
-(**defaults ON**) shows the nine run-persistent relics (Pen Nib, Nunchaku,
-Tuning Fork, Iron Club, Joss Paper, Pendulum, both Happy Flowers, Pollinous Core
+(**defaults ON**) shows the ten run-persistent relics (Pen Nib, Nunchaku,
+Tuning Fork, Iron Club, Galactic Dust, Joss Paper, Pendulum, both Happy Flowers,
+Pollinous Core
 — the `Persistent` registry flag, matching the game's `[SavedProperty]`
 counters), always on while enabled; **Setup Relics Top Left** (**defaults OFF**)
 moves it to the relic bar's left edge; off, it is centered. Both placements draw

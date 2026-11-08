@@ -64,7 +64,8 @@ internal static class CountingTracker
         Func<RelicModel, PlayAhead?, int>? PendingBlock = null,
         bool CountIsBlock = false,
         Func<RelicModel, CardModel, BlockGain>? PlayBlock = null,
-        bool BreakCostsPayoff = false);
+        bool BreakCostsPayoff = false,
+        Func<RelicModel, CardModel, bool>? PlayTriggers = null);
 
     private sealed record PowerSemantics(
         Func<PowerModel, Player, CardModel, CardPlayEffect> PlayEffect,
@@ -231,6 +232,22 @@ internal static class CountingTracker
         [typeof(LetterOpener)] = SkillTicker(),
         [typeof(TuningFork)] = SkillTicker(persistent: true, paysBlock: true),
         [typeof(IronClub)] = AnyCardTicker(persistent: true),
+
+        // Galactic Dust counts Stars spent and grants Block for every full ten.
+        // A card advances it by its whole star cost, so whether this play fires it
+        // depends on the card, not just on the count being one short.
+        [typeof(GalacticDust)] = new(
+            Persistent: true,
+            PlayEffect: (_, card) => CountingRules.TickerPlay(StarsSpent(card) > 0),
+            EndTurn: _ => EndTurnState.Hidden,
+            CountText: relic => StarCount(relic).ToString(),
+            Primed: relic => CountingRules.IsPrimed(StarCount(relic), StarThreshold(relic)),
+            EndTurnTip: (_, _) => null,
+            NextCount: (relic, card) => CountingRules.NextStars(
+                StarCount(relic), StarsSpent(card), StarThreshold(relic)).ToString(),
+            PlayTriggers: (relic, card) => GalacticDustPays(relic, card) > 0,
+            PlayBlock: (relic, card) =>
+                new BlockGain(GalacticDustPays(relic, card) * IntVar(relic, "Block"), 1)),
 
         // Joss Paper counts exhausted cards. Exhaust-keyword cards advance it on
         // play; Ethereal cards carry the badge as a reminder — they feed it only if
@@ -584,15 +601,20 @@ internal static class CountingTracker
                 ? semantics.NextCount?.Invoke(relic, card)
                 : null;
             // A counter fires on this play when it is primed; an armed first-X
-            // source (bare icon, no count) fires on any matching play.
+            // source (bare icon, no count) fires on any matching play. A source
+            // whose tick size depends on the card decides for itself, and its
+            // count turns gold on exactly the cards that fire it.
+            var primed = effect == CardPlayEffect.Contributes && semantics.PlayTriggers is { } fires
+                ? fires(relic, card)
+                : semantics.Primed(relic);
             var willTrigger = effect == CardPlayEffect.Contributes &&
-                (semantics.Primed(relic) || semantics.CountText(relic) == null);
+                (primed || semantics.CountText(relic) == null);
             badges.Add(new SourceBadge(
                 relic.Icon,
                 relic.Id.Entry,
                 next ?? semantics.CountText(relic),
                 Broken: effect == CardPlayEffect.Breaks,
-                Primed: next == null && semantics.Primed(relic),
+                Primed: next == null && primed,
                 Projected: next != null,
                 WillTrigger: willTrigger,
                 BlockValue: semantics.CountIsBlock,
@@ -912,6 +934,20 @@ internal static class CountingTracker
     /// <summary>Stars a card spends as it is played, as CardModel.SpendResources reads them.</summary>
     private static int StarsSpent(CardModel card) =>
         Math.Max(0, card.GetStarCostWithModifiers());
+
+    /// <summary>
+    /// Galactic Dust's Stars toward the next payout. StarsSpent is wrapped after
+    /// each payout; DisplayAmount is not used because it reads the full threshold
+    /// during the activation flash.
+    /// </summary>
+    private static int StarCount(RelicModel relic) =>
+        ((GalacticDust)relic).StarsSpent % StarThreshold(relic);
+
+    private static int StarThreshold(RelicModel relic) => relic.DynamicVars.Stars.IntValue;
+
+    /// <summary>How many payouts a card's star spend sets off, as AfterStarsSpent floors it.</summary>
+    private static int GalacticDustPays(RelicModel relic, CardModel card) =>
+        CountingRules.StarThresholdsCrossed(StarCount(relic), StarsSpent(card), StarThreshold(relic));
 
     private static bool AnyEnemyVulnerable(RelicModel relic) =>
         relic.Owner.Creature.CombatState?.HittableEnemies
