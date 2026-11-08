@@ -310,6 +310,8 @@ The `workshop/` directory is this mod's uploader workspace. See
   populates `workshop/content/`. Do not hand-copy files, and do not ship the
   `.pdb`.
 - Fill in `changeNote` in `workshop/workshop.json` before every update; it is
-  the changelog subscribers see.
+  the changelog subscribers see. Replace it each time: describe only what changed
+  in the new build, briefly and in plain words. Never carry earlier versions'
+  notes forward; Steam already lists every past update.
 - Bump the manifest version and push to GitHub before uploading, so the
   published version always corresponds to a commit.
