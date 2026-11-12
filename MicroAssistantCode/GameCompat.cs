@@ -5,7 +5,8 @@ namespace MicroAssistant.MicroAssistantCode;
 
 /// <summary>
 /// The places where the game's current builds disagree, answered for all of them, so one
-/// DLL loads on the default branch (0.111) and on the beta (0.113) alike.
+/// DLL loads on 0.111 (the previous beta, and this mod's min_game_version) and on 0.113
+/// (the current beta) alike. Main is still 0.107.1, which refuses the mod outright.
 ///
 /// Each member here exists because a direct call compiled against one build fails on
 /// the other. That failure is not a compile error anyone sees. It is a

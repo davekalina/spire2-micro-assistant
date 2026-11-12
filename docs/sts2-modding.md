@@ -122,6 +122,12 @@ Supported-branch enforcement happens Steam-side, not in the manifest: at load ti
 game queries `SteamUGC.GetSupportedGameVersions` for each subscribed item and refuses to
 load a mod whose branch range excludes the player's current branch.
 
+As of 2026-11-12 the branches are far apart: main (`public`) is still 0.107.1 (June 18),
+and the beta (`public-beta`) is 0.113.0. A mod declaring `min_game_version` 0.111.0 is
+refused on main with `GAME_VERSION_UNSUPPORTED`. Mega Crit's 0.113.0 notes say main will
+be brought up to 0.111.0, but that had not happened when this was written; check the
+installed `release_info.json` on main before claiming main support.
+
 `mod_id.txt` is the only link between the repository and the published Workshop item.
 **Commit it. Never gitignore it.** Losing it orphans the item and the next upload creates a
 duplicate.

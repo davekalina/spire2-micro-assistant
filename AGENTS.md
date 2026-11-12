@@ -86,9 +86,19 @@ tokens, the Mighty event cards) go in `CardTableByName` instead, keyed by class
 name: a `typeof` of a card the older build lacks fails `CountingTracker`'s static
 initializer there and silences every badge.
 
-**One build serves every supported game version** — currently 0.111 (main) and
-0.113.0 (beta). Where they differ, the call goes through `GameCompat` by name and
-takes whichever form the running game has; never call a member that differs
+**Supported game versions.** The mod currently works only on the **beta branch,
+0.113.0**. The main (public) branch is still 0.107.1, which refuses the mod
+outright: the manifest declares `min_game_version` 0.111.0. Main support waits
+until Mega Crit promotes a newer build there. Until then, keep the Workshop item
+limited to the beta branch, as before v1.0.2: set the range by hand on the item's
+change notes page after each upload, never through `minBranch`/`maxBranch` in
+`workshop.json` (see `docs/sts2-modding.md`), and keep the Workshop text saying
+beta only.
+
+**One build serves every game version the mod declares** — 0.111.0 (the previous
+beta and its `min_game_version`) and 0.113.0 (the current beta), so the same DLL
+will also serve main once main reaches 0.111 or later. Where they differ, the call
+goes through `GameCompat` by name and takes whichever form the running game has; never call a member that differs
 between them directly. A direct call compiles against whichever `sts2.dll` is
 installed and then throws `MissingMethodException` on the other build — inside
 `Guard`, so all anyone sees is a feature that quietly stopped working. The known
