@@ -98,8 +98,8 @@ beta only.
 **One build serves every game version the mod declares** — 0.111.0 (the previous
 beta and its `min_game_version`) and 0.113.0 (the current beta), so the same DLL
 will also serve main once main reaches 0.111 or later. Where they differ, the call
-goes through `GameCompat` by name and takes whichever form the running game has; never call a member that differs
-between them directly. A direct call compiles against whichever `sts2.dll` is
+goes through `GameCompat` by name and takes whichever form the running game has;
+never call a member that differs between them directly. A direct call compiles against whichever `sts2.dll` is
 installed and then throws `MissingMethodException` on the other build — inside
 `Guard`, so all anyone sees is a feature that quietly stopped working. The known
 difference this mod touches is `HoverTip.Id` (settable on 0.111, get-only on
