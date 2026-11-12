@@ -81,6 +81,24 @@ silently make wrong — a new card just will not be counted. Re-derive it agains
 a new game version by grepping the decompiled `Models/Cards/` for
 `CardCmd.Exhaust`; for `AddGeneratedCard`, `CardCmd.Transform`,
 `Shiv.CreateInHand`, and `ForgeCmd.Forge`; and for `Apply<DoomPower>`.
+Cards that only some supported game versions have (0.113's The Fool, its tarot
+tokens, the Mighty event cards) go in `CardTableByName` instead, keyed by class
+name: a `typeof` of a card the older build lacks fails `CountingTracker`'s static
+initializer there and silences every badge.
+
+**One build serves every supported game version** — currently 0.111 (main) and
+0.113.0 (beta). Where they differ, the call goes through `GameCompat` by name and
+takes whichever form the running game has; never call a member that differs
+between them directly. A direct call compiles against whichever `sts2.dll` is
+installed and then throws `MissingMethodException` on the other build — inside
+`Guard`, so all anyone sees is a feature that quietly stopped working. The known
+difference this mod touches is `HoverTip.Id` (settable on 0.111, get-only on
+0.113), set on the End Turn badges' tips. To check a new game build, compare the
+`[sts2]` member references (and, for inlined enum values and constants, the whole
+normalized IL) between a DLL built against the old game and one built against the
+new (`ilspycmd -il`): any difference is a signature that moved. Then check what
+references cannot show: the Harmony targets, the private Godot reads, node paths,
+resource paths, DynamicVar keys, and the hard-coded thresholds in `CountingTracker`.
 
 The layering that must not regress silently:
 

@@ -219,9 +219,8 @@ internal static class BadgeStrip
             object boxed = new HoverTip(new LocString("gameplay_ui", "DRAW_PILE_INFO"));
             TipTitle.SetValue(boxed, tip.Title);
             TipDescription.SetValue(boxed, tip.Body);
-            var hoverTip = (HoverTip)boxed;
-            hoverTip.Id = $"{MainFile.ModId}.{badge.Id}";
-            NHoverTipSet.CreateAndShow(cell, hoverTip, HoverTipAlignment.Left);
+            GameCompat.SetHoverTipId(boxed, $"{MainFile.ModId}.{badge.Id}");
+            NHoverTipSet.CreateAndShow(cell, (HoverTip)boxed, HoverTipAlignment.Left);
         });
         cell.MouseExited += () => Guard.Run("Hiding a badge hover tip", () =>
             NHoverTipSet.Remove(cell));

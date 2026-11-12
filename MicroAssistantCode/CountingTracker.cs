@@ -958,7 +958,7 @@ internal static class CountingTracker
     /// cards it exhausts (Feel No Pain), how many cards it generates for combat
     /// (Pillar of Creation), and how many Doom applications it makes (Shroud). The
     /// game decides each inside the card's effects, so the table is written out by
-    /// hand, as of game 0.111.0 — re-derive it by grepping Models/Cards/ for
+    /// hand, as of games 0.111.0 and 0.113.0 — re-derive it by grepping Models/Cards/ for
     /// <c>CardCmd.Exhaust</c>; for <c>AddGeneratedCard</c>, <c>CardCmd.Transform</c>,
     /// <c>Shiv.CreateInHand</c>, and <c>ForgeCmd.Forge</c>; and for
     /// <c>Apply&lt;DoomPower&gt;</c>. Types rather than ids on purpose, so a card that
@@ -1083,6 +1083,73 @@ internal static class CountingTracker
         [typeof(NegativePulse)] = new(AppliesDoom: HittableEnemies),
     };
 
+    /// <summary>
+    /// The same table for cards that only some supported game builds have — 0.113's
+    /// The Fool, its tarot tokens, and the Mighty event cards — keyed by class name.
+    /// A <c>typeof</c> of a card 0.111 lacks would fail to load there the moment this
+    /// class initializes and take every badge with it, so these resolve by name and
+    /// simply never match on a build without them. Once 0.111 support ends, move them
+    /// up into <see cref="CardTable" /> as types.
+    /// </summary>
+    private static readonly Dictionary<string, CardEffects> CardTableByName = new()
+    {
+        // ---- Exhausts other cards ----------------------------------------------
+        // Florescence exhausts every Shoot card not already exhausted, wherever it
+        // is, then makes The Shot.
+        ["Florescence"] = new(
+            Exhausts: card => card.Owner.PlayerCombatState?.AllCards.Count(other =>
+                other != card && other.Tags.Contains(CardTag.Shoot) &&
+                other.Pile?.Type != PileType.Exhaust) ?? 0,
+            Generates: _ => 1),
+        ["Growth"] = new(Exhausts: card => OthersInHand(card).Count(other => IsGameCard(other, "Sadness"))),
+        ["TheDevil"] = new(Exhausts: card => OthersInHand(card).Count()),
+        // The Hermit discards one card, exhausting it instead if it is a Curse.
+        ["TheHermit"] = new(Exhausts: card =>
+            CountingRules.OneIfAny(OthersInHand(card).Count(other => other.Type == CardType.Curse))),
+
+        // ---- Generates cards for combat ----------------------------------------
+        ["BlotOutTheSky"] = Generates(1),
+        ["BrightenUp"] = new(Generates: card =>
+            card.DynamicVars["Sadness"].IntValue + card.DynamicVars["Joy"].IntValue),
+        ["Jest"] = GeneratesCardsVar(),
+        ["MightyShield"] = GeneratesCardsVar(),
+        ["MightyWeapon"] = GeneratesCardsVar(),
+        ["PunchOfJoy"] = new(Generates: card =>
+            CountingRules.OneIfAny(OthersInHand(card).Count(other => IsGameCard(other, "Sadness")))),
+        ["Rummage"] = Generates(1),
+        // Self-Deprecate's Joy goes to each living ally, with this player as creator.
+        ["SelfDeprecate"] = new(Generates: card => card.DynamicVars["Sadness"].IntValue +
+            card.DynamicVars["Joy"].IntValue * Math.Max(0, LivingPlayersOnSide(card) - 1)),
+        ["SorrowfulStrike"] = GeneratesCardsVar(),
+        ["TheHierophant"] = GeneratesCardsVar(),
+        // The Lovers and The Moon fill the hand to its cap once this card has left it.
+        ["TheLovers"] = new(Generates: card =>
+            Math.Max(0, CardPile.MaxCardsInHand - OthersInHand(card).Count())),
+        ["TheMoon"] = new(Generates: card =>
+            Math.Max(0, CardPile.MaxCardsInHand - OthersInHand(card).Count())),
+        ["Vitriol"] = Generates(1),
+
+        // ---- Applies Doom ------------------------------------------------------
+        ["Death"] = new(AppliesDoom: _ => 1),
+    };
+
+    /// <summary>A card's row in either table; by-name rows only match the game's own cards.</summary>
+    private static CardEffects? EffectsOf(CardModel card)
+    {
+        var type = card.GetType();
+        return CardTable.GetValueOrDefault(type) ??
+            (type.Assembly == typeof(CardModel).Assembly
+                ? CardTableByName.GetValueOrDefault(type.Name)
+                : null);
+    }
+
+    /// <summary>Whether a card is the game's own card of that class name.</summary>
+    private static bool IsGameCard(CardModel card, string name)
+    {
+        var type = card.GetType();
+        return type.Name == name && type.Assembly == typeof(CardModel).Assembly;
+    }
+
     private static CardEffects Generates(int count) => new(Generates: _ => count);
 
     private static CardEffects GeneratesCardsVar() =>
@@ -1107,7 +1174,7 @@ internal static class CountingTracker
     /// <summary>Cards a play exhausts: itself under the Exhaust keyword, plus its own effect's.</summary>
     private static int ExhaustsOnPlay(CardModel card) =>
         (card.Keywords.Contains(CardKeyword.Exhaust) ? 1 : 0) +
-        (CardTable.GetValueOrDefault(card.GetType())?.Exhausts?.Invoke(card) ?? 0);
+        (EffectsOf(card)?.Exhausts?.Invoke(card) ?? 0);
 
     /// <summary>
     /// Cards generated for combat as this card is played, with the player as their
@@ -1116,7 +1183,7 @@ internal static class CountingTracker
     /// </summary>
     private static int CardsGenerated(Player player, CardModel card)
     {
-        var count = CardTable.GetValueOrDefault(card.GetType())?.Generates?.Invoke(card) ?? 0;
+        var count = EffectsOf(card)?.Generates?.Invoke(card) ?? 0;
         if (card.Type != CardType.Attack)
             return count;
         var attacksBefore = CombatQueries.AttacksStartedThisTurn(player);
@@ -1134,7 +1201,7 @@ internal static class CountingTracker
     }
 
     private static int DoomApplications(CardModel card) =>
-        CardTable.GetValueOrDefault(card.GetType())?.AppliesDoom?.Invoke(card) ?? 0;
+        EffectsOf(card)?.AppliesDoom?.Invoke(card) ?? 0;
 
     private static int Energy(RelicModel relic) =>
         relic.Owner.PlayerCombatState?.Energy ?? 0;
