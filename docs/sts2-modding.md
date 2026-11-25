@@ -124,8 +124,8 @@ load a mod whose branch range excludes the player's current branch.
 
 Branch versions change underneath you. Until November 2026 main (`public`) was 0.107.1
 (June 18), and a mod declaring `min_game_version` 0.111.0 was refused there with
-`GAME_VERSION_UNSUPPORTED`. As of 2026-11-18 main is 0.111.1 and the beta
-(`public-beta`) is 0.113.1. Check the installed `release_info.json` on main before
+`GAME_VERSION_UNSUPPORTED`. As of 2026-11-25 main is 0.111.1 and the beta
+(`public-beta`) is 0.114.0. Check the installed `release_info.json` on main before
 claiming main support.
 
 `mod_id.txt` is the only link between the repository and the published Workshop item.

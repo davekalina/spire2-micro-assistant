@@ -225,6 +225,27 @@ public class CountingRulesTests
     public void Allowance_play(bool matches, int remaining, CardPlayEffect expected) =>
         Assert.Equal(expected, CountingRules.AllowancePlay(matches, remaining));
 
+    // Unmovable: 0.114 counts each card play once; 0.111 (and 0.113) every Block gain.
+    [Theory]
+    [InlineData(0, 111, false)]
+    [InlineData(0, 113, false)]
+    [InlineData(0, 114, true)]
+    [InlineData(0, 120, true)]
+    [InlineData(1, 0, true)]
+    public void Unmovable_rule_by_game_version(int major, int minor, bool expected) =>
+        Assert.Equal(expected, CountingRules.UnmovableCountsDistinctPlays(major, minor));
+
+    [Fact]
+    public void Unmovable_used_counts_gains_or_plays()
+    {
+        // Two plays: the first gained Block twice (e.g. a two-hit Block card).
+        object twice = new(), once = new();
+        object[] playPerGain = [twice, twice, once];
+        Assert.Equal(3, CountingRules.BlockPlaysUsed(playPerGain, distinctPlays: false));
+        Assert.Equal(2, CountingRules.BlockPlaysUsed(playPerGain, distinctPlays: true));
+        Assert.Equal(0, CountingRules.BlockPlaysUsed(Array.Empty<object>(), distinctPlays: true));
+    }
+
     // Projected values: the number a counter will read after the held card is played.
     [Theory]
     [InlineData(5, 10, 6)]

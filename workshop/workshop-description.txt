@@ -15,4 +15,4 @@ Check out this video for a demo of the mod in action:  https://www.youtube.com/w
 Source code and issue tracker:
 https://github.com/davekalina/spire2-micro-assistant
 
-Micro Assistant works on both the main branch (version 0.111.1) and the beta branch (version 0.113.1).
+Micro Assistant works on both the main branch (version 0.111.1) and the beta branch (version 0.114.0).

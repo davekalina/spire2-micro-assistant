@@ -79,15 +79,18 @@ each card's own effects, with no keyword or tag to test. So
 off the card before play. It is the one thing here that a game update can
 silently make wrong — a new card just will not be counted. Re-derive it against
 a new game version by grepping the decompiled `Models/Cards/` for
-`CardCmd.Exhaust`; for `AddGeneratedCard`, `CardCmd.Transform`,
-`Shiv.CreateInHand`, and `ForgeCmd.Forge`; and for `Apply<DoomPower>`.
-Cards that only some supported game versions have (0.113's The Fool, its tarot
-tokens, the Mighty event cards) go in `CardTableByName` instead, keyed by class
+`CardCmd.Exhaust`; for `AddGeneratedCard`, `AddToCombatAndPreview`,
+`CardCmd.Transform`, `TransformIntoAfterPlay`, `Shiv.CreateInHand`, and
+`ForgeCmd.Forge`; and for `Apply<DoomPower>`. Then re-read every existing row's
+`OnPlay` against the new build: a card can keep its name and change what it does
+(0.114's Florescence and Growth transform instead of exhausting).
+Cards that only some supported game versions have (The Fool, new since 0.111, its
+tarot tokens, the Mighty event cards) go in `CardTableByName` instead, keyed by class
 name: a `typeof` of a card the older build lacks fails `CountingTracker`'s static
 initializer there and silences every badge.
 
-**Supported game versions.** The mod works on **both branches**: as of 2026-11-18
-main (public) is 0.111.1 and the beta is 0.113.1, both at or above the manifest's
+**Supported game versions.** The mod works on **both branches**: as of 2026-11-25
+main (public) is 0.111.1 and the beta is 0.114.0, both at or above the manifest's
 `min_game_version` 0.111.0. So the Workshop item's branch range is empty — no
 minimum, no maximum, which is what a new upload gets by default — and the Workshop
 text names both branches. Until 2026-11-18 main was 0.107.1, which refuses the mod
@@ -97,13 +100,18 @@ and never through `minBranch`/`maxBranch` in `workshop.json` (see
 `docs/sts2-modding.md`).
 
 **One build serves every game version the mod declares** — 0.111 (main, and the
-manifest's `min_game_version`) and 0.113 (the current beta). Where they differ, the call
+manifest's `min_game_version`) and 0.114 (the current beta); 0.113, the previous beta,
+keeps working harmlessly. Where they differ, the call
 goes through `GameCompat` by name and takes whichever form the running game has;
 never call a member that differs between them directly. A direct call compiles against whichever `sts2.dll` is
 installed and then throws `MissingMethodException` on the other build — inside
 `Guard`, so all anyone sees is a feature that quietly stopped working. The known
-difference this mod touches is `HoverTip.Id` (settable on 0.111, get-only on
-0.113), set on the End Turn badges' tips. To check a new game build, compare the
+signature difference this mod touches is `HoverTip.Id` (settable on 0.111, get-only
+from 0.113), set on the End Turn badges' tips. Rule changes behind an unchanged
+signature are decided in `GameCompat` by the running game's version
+(`ReleaseInfoManager.SemVer`, which the mod loader also uses): Unmovable counts every
+Block gain this turn on 0.111 and each card play once from 0.114, and
+`CombatQueries.BlockPlaysThisTurn` follows whichever the game runs. To check a new game build, compare the
 `[sts2]` member references (and, for inlined enum values and constants, the whole
 normalized IL) between a DLL built against the old game and one built against the
 new (`ilspycmd -il`): any difference is a signature that moved. Then check what

@@ -69,13 +69,20 @@ internal static class CombatQueries
             e.CardPlay.Card.Type is CardType.Attack or CardType.Skill &&
             e.CardPlay.Player == player);
 
-    /// <summary>Unmovable's count of block-gaining card plays this turn.</summary>
+    /// <summary>
+    /// Unmovable's count of this turn's card-play Block gains: one per gain on 0.111,
+    /// one per distinct card play from 0.114 (see <see cref="GameCompat.UnmovableCountsDistinctPlays" />).
+    /// </summary>
     public static int BlockPlaysThisTurn(Player player) =>
-        History.Entries.OfType<BlockGainedEntry>().Count(e =>
-            e.HappenedThisTurn(StateOf(player)) &&
-            e.CardPlay != null &&
-            e.CardPlay.Player.Creature == player.Creature &&
-            e.Props.IsCardOrMonsterMove());
+        CountingRules.BlockPlaysUsed(
+            History.Entries.OfType<BlockGainedEntry>()
+                .Where(e =>
+                    e.HappenedThisTurn(StateOf(player)) &&
+                    e.CardPlay != null &&
+                    e.CardPlay.Player.Creature == player.Creature &&
+                    e.Props.IsCardOrMonsterMove())
+                .Select(e => e.CardPlay!),
+            GameCompat.UnmovableCountsDistinctPlays);
 
     /// <summary>Lethality's and Juggling's count (both read plays as they start).</summary>
     public static int AttacksStartedThisTurn(Player player) =>

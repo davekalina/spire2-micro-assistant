@@ -958,11 +958,12 @@ internal static class CountingTracker
     /// cards it exhausts (Feel No Pain), how many cards it generates for combat
     /// (Pillar of Creation), and how many Doom applications it makes (Shroud). The
     /// game decides each inside the card's effects, so the table is written out by
-    /// hand, as of games 0.111.0 and 0.113.0 — re-derive it by grepping Models/Cards/ for
-    /// <c>CardCmd.Exhaust</c>; for <c>AddGeneratedCard</c>, <c>CardCmd.Transform</c>,
-    /// <c>Shiv.CreateInHand</c>, and <c>ForgeCmd.Forge</c>; and for
-    /// <c>Apply&lt;DoomPower&gt;</c>. Types rather than ids on purpose, so a card that
-    /// leaves the game breaks the build here instead of quietly dropping out. Each
+    /// hand, as of games 0.111.0 and 0.114.0 — re-derive it by grepping Models/Cards/ for
+    /// <c>CardCmd.Exhaust</c>; for <c>AddGeneratedCard</c>, <c>AddToCombatAndPreview</c>,
+    /// <c>CardCmd.Transform</c>, <c>TransformIntoAfterPlay</c>, <c>Shiv.CreateInHand</c>,
+    /// and <c>ForgeCmd.Forge</c>; and for <c>Apply&lt;DoomPower&gt;</c>. Types rather
+    /// than ids on purpose, so a card that leaves the game breaks the build here
+    /// instead of quietly dropping out. Each
     /// count is read off the card before it is played. A free choice ("up to N",
     /// Guards' any number) counts the most the play could do; a skippable
     /// choose-one counts the one.
@@ -1084,8 +1085,9 @@ internal static class CountingTracker
     };
 
     /// <summary>
-    /// The same table for cards that only some supported game builds have — 0.113's
-    /// The Fool, its tarot tokens, and the Mighty event cards — keyed by class name.
+    /// The same table for cards that only some supported game builds have — The Fool
+    /// (new since 0.111), its tarot tokens, and the Mighty event cards — keyed by class
+    /// name, with each row as 0.114 plays it.
     /// A <c>typeof</c> of a card 0.111 lacks would fail to load there the moment this
     /// class initializes and take every badge with it, so these resolve by name and
     /// simply never match on a build without them. Once 0.111 support ends, move them
@@ -1094,14 +1096,7 @@ internal static class CountingTracker
     private static readonly Dictionary<string, CardEffects> CardTableByName = new()
     {
         // ---- Exhausts other cards ----------------------------------------------
-        // Florescence exhausts every Shoot card not already exhausted, wherever it
-        // is, then makes The Shot.
-        ["Florescence"] = new(
-            Exhausts: card => card.Owner.PlayerCombatState?.AllCards.Count(other =>
-                other != card && other.Tags.Contains(CardTag.Shoot) &&
-                other.Pile?.Type != PileType.Exhaust) ?? 0,
-            Generates: _ => 1),
-        ["Growth"] = new(Exhausts: card => OthersInHand(card).Count(other => IsGameCard(other, "Sadness"))),
+        ["Optimism"] = new(Exhausts: card => OthersInHand(card).Count(other => IsGameCard(other, "Sadness"))),
         ["TheDevil"] = new(Exhausts: card => OthersInHand(card).Count()),
         // The Hermit discards one card, exhausting it instead if it is a Curse.
         ["TheHermit"] = new(Exhausts: card =>
@@ -1111,11 +1106,20 @@ internal static class CountingTracker
         ["BlotOutTheSky"] = Generates(1),
         ["BrightenUp"] = new(Generates: card =>
             card.DynamicVars["Sadness"].IntValue + card.DynamicVars["Joy"].IntValue),
+        // Florescence transforms one chosen card in hand into The Shot.
+        ["Florescence"] = new(Generates: card =>
+            CountingRules.OneIfAny(OthersInHand(card).Count(other => other.IsTransformable))),
+        // Growth transforms one random Sadness in hand into a copy of itself.
+        ["Growth"] = new(Generates: card =>
+            CountingRules.OneIfAny(OthersInHand(card).Count(other => IsGameCard(other, "Sadness")))),
         ["Jest"] = GeneratesCardsVar(),
         ["MightyShield"] = GeneratesCardsVar(),
         ["MightyWeapon"] = GeneratesCardsVar(),
-        ["PunchOfJoy"] = new(Generates: card =>
-            CountingRules.OneIfAny(OthersInHand(card).Count(other => IsGameCard(other, "Sadness")))),
+        // Mourning Blow turns into a Sadness once played.
+        ["MourningBlow"] = Generates(1),
+        // Punch of Joy transforms up to Cards random Sadness in hand into Joy.
+        ["PunchOfJoy"] = new(Generates: card => Math.Min(card.DynamicVars.Cards.IntValue,
+            OthersInHand(card).Count(other => IsGameCard(other, "Sadness")))),
         ["Rummage"] = Generates(1),
         // Self-Deprecate's Joy goes to each living ally, with this player as creator.
         ["SelfDeprecate"] = new(Generates: card => card.DynamicVars["Sadness"].IntValue +
@@ -1127,7 +1131,9 @@ internal static class CountingTracker
             Math.Max(0, CardPile.MaxCardsInHand - OthersInHand(card).Count())),
         ["TheMoon"] = new(Generates: card =>
             Math.Max(0, CardPile.MaxCardsInHand - OthersInHand(card).Count())),
-        ["Vitriol"] = Generates(1),
+        // The Sun shuffles two Soot into the draw pile.
+        ["TheSun"] = Generates(2),
+        ["Vitriol"] = GeneratesCardsVar(),
 
         // ---- Applies Doom ------------------------------------------------------
         ["Death"] = new(AppliesDoom: _ => 1),

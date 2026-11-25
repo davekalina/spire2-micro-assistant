@@ -199,6 +199,22 @@ public static class CountingRules
         !cardMatches ? CardPlayEffect.None :
         remaining > 0 ? CardPlayEffect.Contributes : CardPlayEffect.Breaks;
 
+    /// <summary>
+    /// Whether Unmovable counts distinct card plays rather than Block gains: 0.114
+    /// changed it to one per play (a card gaining Block twice spends one doubling);
+    /// 0.111 counts every gain. Earlier betas keep the older rule.
+    /// </summary>
+    public static bool UnmovableCountsDistinctPlays(int major, int minor) =>
+        major > 0 || minor >= 114;
+
+    /// <summary>
+    /// Unmovable's spent allowance from the card plays behind this turn's Block
+    /// gains, one entry per gain: each play once, or each gain.
+    /// </summary>
+    public static int BlockPlaysUsed<TPlay>(IEnumerable<TPlay> playPerGain, bool distinctPlays)
+        where TPlay : class =>
+        distinctPlays ? playPerGain.Distinct().Count() : playPerGain.Count();
+
     // Projected values: what a counter will read after the selected card is played.
     // Shown in place of the current count while a card is held for play.
 
